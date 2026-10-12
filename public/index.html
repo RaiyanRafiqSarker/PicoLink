@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NanoLink — High-Performance URL Shortener & Click Stream Engine</title>
+  <meta name="description" content="Production-ready, high-performance URL Shortener powered by PostgreSQL, Redis Cache-Aside, Base62 encoding, and real-time click stream analytics.">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            dark: {
+              900: '#090d16',
+              800: '#0f172a',
+              700: '#1e293b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="min-h-screen bg-[#090d16] text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Ambient Glow Background -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px]"></div>
+    <div class="absolute top-1/3 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[140px]"></div>
+    <div class="absolute -bottom-40 left-1/3 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px]"></div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="relative z-10 max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+
+    <!-- Top Navigation Bar -->
+    <header class="flex flex-col sm:flex-row items-center justify-between gap-4 pb-8 mb-8 border-b border-slate-800/80">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <i data-lucide="zap" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">NanoLink</span>
+          <span class="ml-2 text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Production Engine</span>
+        </div>
+      </div>
+
+      <!-- Health status badge -->
+      <div class="flex items-center gap-4">
+        <div id="systemHealthBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-beacon"></span>
+          <span id="healthStatusText">Postgres & Redis Online</span>
+        </div>
+        <a href="#analyticsSection" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition-all flex items-center gap-1.5">
+          <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Live Analytics
+        </a>
+      </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="text-center max-w-3xl mx-auto mb-10">
+      <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4">
+        Enterprise URL Shortener <br />
+        <span class="gradient-text">High-Throughput & Analytics</span>
+      </h1>
+      <p class="text-slate-400 text-base sm:text-lg leading-relaxed">
+        Sub-millisecond redirection via Redis Cache-Aside, collision-free Base62 keys with sequence offset, SSRF defense, and asynchronous clickstream analytics.
+      </p>
+    </section>
+
+    <!-- Shortener Input Card -->
+    <div class="glass-panel rounded-2xl p-6 sm:p-8 mb-12 shadow-2xl relative overflow-hidden">
+      <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+
+      <form id="shortenForm" class="space-y-6">
+        <!-- Long URL Input Field -->
+        <div>
+          <label for="originalUrl" class="block text-sm font-semibold text-slate-300 mb-2">
+            Target Destination URL <span class="text-rose-400">*</span>
+          </label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <i data-lucide="link" class="w-5 h-5"></i>
+            </div>
+            <input 
+              type="url" 
+              id="originalUrl" 
+              name="originalUrl" 
+              required
+              placeholder="https://example.com/very-long-product-campaign-link"
+              class="glass-input w-full pl-11 pr-24 py-3.5 rounded-xl text-slate-100 placeholder-slate-500 text-sm font-normal focus:outline-none"
+            >
+            <button 
+              type="button" 
+              id="pasteBtn"
+              class="absolute inset-y-1.5 right-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 border border-slate-700/60 transition-colors"
+              title="Paste from clipboard"
+            >
+              <i data-lucide="clipboard" class="w-3.5 h-3.5"></i> Paste
+            </button>
+          </div>
+          <p class="mt-1.5 text-xs text-slate-400 flex items-center gap-1">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+            Protected by SSRF firewall (loopback, private subnets, and self-referencing links are blocked).
+          </p>
+        </div>
+
+        <!-- Optional Custom Slug and Expiration Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Vanity Custom Slug -->
+          <div>
+            <label for="customSlug" class="block text-sm font-semibold text-slate-300 mb-2">
+              Custom Vanity Slug <span class="text-xs font-normal text-slate-400">(Optional)</span>
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 font-mono text-sm">
+                /
+              </div>
+              <input 
+                type="text" 
+                id="customSlug" 
+                name="customSlug" 
+                maxlength="64"
+                placeholder="my-campaign-2026"
+                class="glass-input w-full pl-8 pr-3.5 py-3 rounded-xl text-slate-100 placeholder-slate-500 text-sm font-mono focus:outline-none"
+              >
+            </div>
+            <p class="mt-1.5 text-xs text-slate-400">Leave blank for auto-generated Base62 sequential key.</p>
+          </div>
+
+          <!-- Expiration Period -->
+          <div>
+            <label for="expiresInDays" class="block text-sm font-semibold text-slate-300 mb-2">
+              Link Expiration
+            </label>
+            <select 
+              id="expiresInDays" 
+              name="expiresInDays"
+              class="glass-input w-full px-3.5 py-3 rounded-xl text-slate-100 text-sm focus:outline-none cursor-pointer"
+            >
+              <option value="" class="bg-slate-900 text-slate-100">Never Expire (Permanent)</option>
+              <option value="1" class="bg-slate-900 text-slate-100">24 Hours (1 Day)</option>
+              <option value="7" class="bg-slate-900 text-slate-100">7 Days</option>
+              <option value="30" class="bg-slate-900 text-slate-100">30 Days</option>
+              <option value="90" class="bg-slate-900 text-slate-100">90 Days</option>
+              <option value="365" class="bg-slate-900 text-slate-100">1 Year</option>
+            </select>
+            <p class="mt-1.5 text-xs text-slate-400">Expired links automatically return HTTP 410 Gone.</p>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div>
+          <button 
+            type="submit" 
+            id="shortenSubmitBtn"
+            class="gradient-border-btn w-full py-3.5 px-6 rounded-xl text-white font-bold text-sm tracking-wide flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span id="shortenBtnText">Shorten URL</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Shorten Result Card (Hidden Initially) -->
+      <div id="resultCard" class="hidden mt-8 pt-6 border-t border-slate-800">
+        <div class="glass-card rounded-xl p-5 border border-indigo-500/30 bg-indigo-950/20">
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <span class="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i> Short Link Created
+            </span>
+            <span id="resultExpiryBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              Never Expires
+            </span>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <input 
+              type="text" 
+              id="shortUrlOutput" 
+              readonly 
+              class="glass-input font-mono font-medium text-emerald-400 text-base flex-1 px-4 py-2.5 rounded-lg select-all focus:outline-none"
+            >
+            <div class="flex items-center gap-2">
+              <button 
+                id="copyBtn" 
+                class="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/30"
+              >
+                <i data-lucide="copy" class="w-4 h-4"></i>
+                <span id="copyBtnText">Copy Link</span>
+              </button>
+              <a 
+                id="testRedirectLink" 
+                href="#" 
+                target="_blank" 
+                class="px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors"
+                title="Test redirect in new tab"
+              >
+                <i data-lucide="external-link" class="w-4 h-4"></i> Test
+              </a>
+              <button 
+                id="inspectThisStatsBtn" 
+                class="px-4 py-2.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/40 text-purple-200 text-xs font-bold flex items-center gap-1.5 border border-purple-500/30 transition-colors"
+              >
+                <i data-lucide="bar-chart" class="w-4 h-4"></i> Analytics
+              </button>
+            </div>
+          </div>
+
+          <!-- Original URL snippet -->
+          <div class="mt-3 text-xs text-slate-400 truncate flex items-center gap-2">
+            <span class="text-slate-500">Destination:</span>
+            <span id="resultOriginalUrl" class="font-mono text-slate-300 truncate"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Inspector Section -->
+    <section id="analyticsSection" class="glass-panel rounded-2xl p-6 sm:p-8 mb-12 shadow-2xl relative">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-bold flex items-center gap-2.5 text-white">
+            <i data-lucide="activity" class="w-6 h-6 text-indigo-400"></i>
+            Real-Time Analytics Inspector
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400 mt-1">
+            Track click counts, referrer sources, country distribution, and latency-free telemetry.
+          </p>
+        </div>
+
+        <!-- Search Bar by Short Code -->
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="relative flex-1 sm:w-56">
+            <input 
+              type="text" 
+              id="statsSearchCode" 
+              placeholder="e.g. 6V5je or custom-slug" 
+              class="glass-input w-full pl-3 pr-3 py-2 rounded-lg text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none"
+            >
+          </div>
+          <button 
+            id="statsSearchBtn" 
+            class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          >
+            <i data-lucide="search" class="w-3.5 h-3.5"></i> Inspect
+          </button>
+        </div>
+      </div>
+
+      <!-- Recent Links Quick-Pill Bar -->
+      <div class="mb-6 flex items-center gap-2 overflow-x-auto pb-2" id="recentLinksBar">
+        <span class="text-xs text-slate-500 font-medium shrink-0">Recent Links:</span>
+        <div id="recentLinksPills" class="flex items-center gap-2 flex-nowrap">
+          <span class="text-xs text-slate-600 italic">No links generated yet.</span>
+        </div>
+      </div>
+
+      <!-- Stats Overview Display Container -->
+      <div id="statsContent" class="space-y-6">
+        <!-- Default Empty State -->
+        <div id="statsEmptyState" class="py-12 text-center text-slate-500">
+          <i data-lucide="pie-chart" class="w-12 h-12 mx-auto mb-3 text-slate-600 opacity-60"></i>
+          <p class="text-sm">Create a link above or enter a short code to view real-time click analytics.</p>
+        </div>
+
+        <!-- Populated State (Hidden Initially) -->
+        <div id="statsDataContainer" class="hidden space-y-6">
+          <!-- 4 Summary KPI Cards -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Clicks -->
+            <div class="glass-card rounded-xl p-4 border border-slate-800">
+              <span class="text-xs text-slate-400 font-medium uppercase tracking-wider block mb-1">Total Clicks</span>
+              <div class="flex items-baseline gap-2">
+                <span id="metricTotalClicks" class="text-3xl font-extrabold text-white font-mono">0</span>
+                <span class="text-xs text-emerald-400 font-semibold flex items-center">
+                  <i data-lucide="arrow-up-right" class="w-3 h-3"></i> Live
+                </span>
+              </div>
+            </div>
+
+            <!-- Top Country -->
+            <div class="glass-card rounded-xl p-4 border border-slate-800">
+              <span class="text-xs text-slate-400 font-medium uppercase tracking-wider block mb-1">Top Country</span>
+              <div class="flex items-baseline gap-2">
+                <span id="metricTopCountry" class="text-2xl font-bold text-white font-mono">—</span>
+                <span id="metricTopCountryClicks" class="text-xs text-slate-400">0 clicks</span>
+              </div>
+            </div>
+
+            <!-- Primary Referrer -->
+            <div class="glass-card rounded-xl p-4 border border-slate-800">
+              <span class="text-xs text-slate-400 font-medium uppercase tracking-wider block mb-1">Primary Referrer</span>
+              <div class="truncate">
+                <span id="metricTopReferrer" class="text-base font-bold text-white truncate block">Direct / None</span>
+                <span id="metricTopReferrerClicks" class="text-xs text-slate-400">0 clicks</span>
+              </div>
+            </div>
+
+            <!-- Status / Validity -->
+            <div class="glass-card rounded-xl p-4 border border-slate-800">
+              <span class="text-xs text-slate-400 font-medium uppercase tracking-wider block mb-1">Status</span>
+              <div>
+                <span id="metricStatusPill" class="inline-block text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  Active
+                </span>
+                <span id="metricExpiresAt" class="text-xs text-slate-400 block mt-1 truncate">Never expires</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Breakdown Charts Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Country Breakdown Card -->
+            <div class="glass-card rounded-xl p-5 border border-slate-800">
+              <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+                <i data-lucide="globe" class="w-4 h-4 text-indigo-400"></i> Traffic by Country
+              </h3>
+              <div id="countryList" class="space-y-3">
+                <p class="text-xs text-slate-500">No country events recorded yet.</p>
+              </div>
+            </div>
+
+            <!-- Referrers Breakdown Card -->
+            <div class="glass-card rounded-xl p-5 border border-slate-800">
+              <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+                <i data-lucide="compass" class="w-4 h-4 text-purple-400"></i> Top Traffic Referrers
+              </h3>
+              <div id="referrerList" class="space-y-3">
+                <p class="text-xs text-slate-500">No referrer data recorded yet.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Click Timeline Mini-Graph -->
+          <div class="glass-card rounded-xl p-5 border border-slate-800">
+            <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+              <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> Click Activity (Daily)
+            </h3>
+            <div id="timelineContainer" class="h-32 flex items-end gap-2 pt-6 pb-2 border-b border-slate-800 overflow-x-auto">
+              <!-- Dynamically populated bars -->
+            </div>
+          </div>
+
+          <!-- Recent Click Stream Table -->
+          <div class="glass-card rounded-xl p-5 border border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <i data-lucide="list" class="w-4 h-4 text-indigo-400"></i> Live Click Stream Log
+              </h3>
+              <button id="refreshStatsBtn" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
+                <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Refresh
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="text-slate-400 border-b border-slate-800">
+                    <th class="py-2.5 px-3 font-semibold">Timestamp</th>
+                    <th class="py-2.5 px-3 font-semibold">Country</th>
+                    <th class="py-2.5 px-3 font-semibold">Referrer</th>
+                    <th class="py-2.5 px-3 font-semibold">User Agent</th>
+                  </tr>
+                </thead>
+                <tbody id="clickStreamTableBody" class="divide-y divide-slate-800/60 font-mono">
+                  <tr>
+                    <td colspan="4" class="py-4 text-center text-slate-500 font-sans">No clicks recorded yet. Click the test redirect button to generate telemetry.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture & Production Highlights Footer -->
+    <footer class="pt-8 pb-12 border-t border-slate-800/80 text-xs text-slate-500">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 text-left">
+        <div>
+          <span class="font-bold text-slate-300 block mb-1">Base62 Key Generator</span>
+          <p class="text-slate-500">Sequence offset at 100,000,000 ensures collision-free 5-6 character codes with zero hashing overhead.</p>
+        </div>
+        <div>
+          <span class="font-bold text-slate-300 block mb-1">Cache-Aside & LPUSH</span>
+          <p class="text-slate-500">Sub-millisecond redirects served from Redis. Clicks pushed to Redis queue for non-blocking I/O.</p>
+        </div>
+        <div>
+          <span class="font-bold text-slate-300 block mb-1">Batch Click Consumer</span>
+          <p class="text-slate-500">Background worker drains Redis queue and bulk-inserts batches of 50-100 events into PostgreSQL.</p>
+        </div>
+        <div>
+          <span class="font-bold text-slate-300 block mb-1">SSRF & Rate Limiting</span>
+          <p class="text-slate-500">Strict DNS inspection blocks private RFC 1918 subnets, cloud metadata (169.254), and limits 30 req/min.</p>
+        </div>
+      </div>
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <p>&copy; 2026 NanoLink Engine. Built for production scale with PostgreSQL & Redis.</p>
+        <div class="flex items-center gap-3">
+          <span class="font-mono text-[11px] text-slate-600">FastAPI / Node.js • PostgreSQL 16 • Redis 7</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- Application Logic -->
+  <script src="/js/app.js"></script>
+</body>
+</html>

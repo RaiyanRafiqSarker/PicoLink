@@ -1,0 +1,137 @@
+services:
+  # ==========================================
+  # 1. PostgreSQL 16 Database
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: picolink_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-urlshortener}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-urlshortener}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - picolink_net
+
+  # ==========================================
+  # 2. Redis 7 Cache & Click Queue
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: picolink_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - picolink_net
+
+  # ==========================================
+  # 3. Django Backend & REST API
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: picolink_backend
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py init_superuser &&
+             python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DEBUG: "True"
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-urlshortener}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-admin123456}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@picolink.dev}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8000}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - picolink_net
+
+  # ==========================================
+  # 4. Asynchronous Click Consumer Worker
+  # ==========================================
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: picolink_worker
+    restart: unless-stopped
+    command: python shortener/worker.py
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-urlshortener}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      WORKER_BATCH_SIZE: 50
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - picolink_net
+
+  # ==========================================
+  # 5. Next.js Frontend Application
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: picolink_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - picolink_net
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+networks:
+  picolink_net:
+    driver: bridge
