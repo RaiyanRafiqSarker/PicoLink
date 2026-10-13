@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import {
+  Download,
+  QrCode,
   Zap,
   Activity,
   Copy,
@@ -137,6 +140,8 @@ export default function Home() {
   const [shortenError, setShortenError] = useState("");
   const [shortenResult, setShortenResult] = useState<ShortenResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const qrSvgRef = useRef<SVGSVGElement>(null);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Analytics state
   const [lookupCode, setLookupCode] = useState("");
@@ -497,6 +502,30 @@ export default function Home() {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const triggerDownload = (href: string, filename: string) => {
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const downloadQrPng = (code: string) => {
+    const canvas = qrCanvasRef.current;
+    if (!canvas) return;
+    triggerDownload(canvas.toDataURL("image/png"), `picolink-${code}.png`);
+  };
+
+  const downloadQrSvg = (code: string) => {
+    const svg = qrSvgRef.current;
+    if (!svg) return;
+    const markup = new XMLSerializer().serializeToString(svg);
+    const url = URL.createObjectURL(new Blob([markup], { type: "image/svg+xml" }));
+    triggerDownload(url, `picolink-${code}.svg`);
+    URL.revokeObjectURL(url);
   };
 
   const handleFetchStats = async (codeToQuery?: string) => {
@@ -947,6 +976,58 @@ export default function Home() {
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
+                  </div>
+
+                  {/* QR Code */}
+                  <div className="mt-4 flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-950/60 rounded-xl border border-slate-800">
+                    <div className="p-3 bg-white rounded-xl shrink-0">
+                      <QRCodeSVG
+                        ref={qrSvgRef}
+                        value={shortenResult.short_url}
+                        size={144}
+                        level="M"
+                        marginSize={2}
+                        bgColor="#FFFFFF"
+                        fgColor="#000000"
+                        title={`QR code for ${shortenResult.short_url}`}
+                        className="block w-36 h-36"
+                      />
+                    </div>
+                    {/* High-resolution copy used only for the PNG download */}
+                    <QRCodeCanvas
+                      ref={qrCanvasRef}
+                      value={shortenResult.short_url}
+                      size={1024}
+                      level="M"
+                      marginSize={2}
+                      bgColor="#FFFFFF"
+                      fgColor="#000000"
+                      className="hidden"
+                      aria-hidden="true"
+                    />
+                    <div className="w-full text-center sm:text-left">
+                      <p className="text-sm font-semibold text-white flex items-center justify-center sm:justify-start gap-1.5">
+                        <QrCode className="w-4 h-4 text-indigo-400" />
+                        Scan to open
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400 break-all">{shortenResult.short_url}</p>
+                      <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                        <button
+                          onClick={() => downloadQrPng(shortenResult.short_code)}
+                          className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Download QR Code (PNG)
+                        </button>
+                        <button
+                          onClick={() => downloadQrSvg(shortenResult.short_code)}
+                          className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          SVG
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
