@@ -60,3 +60,21 @@ class LinkClickAdmin(admin.ModelAdmin):
             return "-"
         return obj.user_agent[:45] + ("..." if len(obj.user_agent) > 45 else "")
     user_agent_truncated.short_description = "User Agent"
+
+
+from .models import UserProfile, DailyQuotaRecord
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "subscription_tier", "is_subscribed", "google_id", "created_at")
+    list_filter = ("subscription_tier", "is_subscribed")
+    search_fields = ("user__username", "user__email", "google_id")
+
+
+@admin.register(DailyQuotaRecord)
+class DailyQuotaRecordAdmin(admin.ModelAdmin):
+    list_display = ("key", "count", "date", "updated_at")
+    list_filter = ("date",)
+    search_fields = ("key",)
+

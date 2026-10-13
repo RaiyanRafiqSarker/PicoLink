@@ -9,11 +9,20 @@ from django.contrib.auth import get_user_model
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import URL, LinkClick
-from .serializers import ShortenRequestSerializer, URLResponseSerializer, UserMeSerializer
+from .models import URL, LinkClick, UserProfile
+from .serializers import (
+    ShortenRequestSerializer,
+    URLResponseSerializer,
+    UserMeSerializer,
+    UserRegisterSerializer,
+    UserLoginSerializer,
+    GoogleAuthSerializer,
+)
 from .utils.base62 import encode_base62, SEQUENCE_OFFSET
 from .redis_client import redis_client
+from .services.quota import QuotaService
 
 User = get_user_model()
 
@@ -82,6 +91,22 @@ class ShortenView(APIView):
         custom_slug = data.get("custom_slug", "").strip()
         expires_in_days = data.get("expires_in_days")
 
+        # Enforce Tiered Daily Link Quota
+        is_allowed, quota_info = QuotaService.check_and_enforce_quota(request)
+        if not is_allowed:
+            return Response(
+                {
+                    "error": "QuotaExceeded",
+                    "tier": quota_info.get("tier"),
+                    "limit": quota_info.get("limit"),
+                    "used": quota_info.get("used"),
+                    "remaining": quota_info.get("remaining", 0),
+                    "message": quota_info.get("message", "Daily quota exceeded."),
+                    "details": quota_info,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
         expires_at = None
         if expires_in_days:
             expires_at = timezone.now() + timedelta(days=expires_in_days)
@@ -121,7 +146,9 @@ class ShortenView(APIView):
                 pass
 
         out_serializer = URLResponseSerializer(url_obj, context={"request": request})
-        return Response(out_serializer.data, status=status.HTTP_201_CREATED)
+        res_data = dict(out_serializer.data)
+        res_data["quota"] = QuotaService.get_quota_info(request)
+        return Response(res_data, status=status.HTTP_201_CREATED)
 
 
 class RedirectView(APIView):
@@ -286,7 +313,234 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         serializer = UserMeSerializer(request.user)
-        return Response(serializer.data)
+        data = dict(serializer.data)
+        data["quota"] = QuotaService.get_quota_info(request)
+        return Response(data)
+
+
+class UserQuotaView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        quota_info = QuotaService.get_quota_info(request)
+        return Response(quota_info)
+
+
+class UserRegisterView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = UserRegisterSerializer(data=request.data)
+        if not serializer.is_valid():
+            first_err_key = next(iter(serializer.errors))
+            first_err_val = serializer.errors[first_err_key]
+            err_msg = first_err_val[0] if isinstance(first_err_val, list) else str(first_err_val)
+            return Response(
+                {"error": "Bad Request", "message": f"{first_err_key}: {err_msg}", "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"].lower().strip()
+        password = serializer.validated_data["password"]
+        custom_username = serializer.validated_data.get("username", "").strip()
+
+        if User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {"error": "Conflict", "message": "An account with this email address already exists. Please log in."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        base_username = custom_username or email.split("@")[0]
+        # Clean username
+        clean_user = "".join(c for c in base_username if c.isalnum() or c in ("_", "-")) or "user"
+        username = clean_user
+        counter = 1
+        while User.objects.filter(username__iexact=username).exists():
+            username = f"{clean_user}{counter}"
+            counter += 1
+
+        user = User.objects.create_user(username=username, email=email, password=password)
+        UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "subscription_tier": UserProfile.TIER_FREE,
+                "is_subscribed": False,
+            }
+        )
+
+        refresh = RefreshToken.for_user(user)
+        user_data = UserMeSerializer(user).data
+        quota_data = QuotaService.get_quota_info(request)
+
+        return Response(
+            {
+                "message": "Account created successfully.",
+                "user": user_data,
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                },
+                "quota": quota_data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class UserLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = UserLoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"error": "Bad Request", "message": "Username/email and password are required.", "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        identifier = serializer.validated_data["username_or_email"].strip()
+        password = serializer.validated_data["password"]
+
+        user = (
+            User.objects.filter(email__iexact=identifier).first()
+            or User.objects.filter(username__iexact=identifier).first()
+        )
+
+        if not user or not user.check_password(password):
+            return Response(
+                {"error": "Unauthorized", "message": "Invalid email/username or password."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "subscription_tier": UserProfile.TIER_PRO if user.is_superuser else UserProfile.TIER_FREE,
+                "is_subscribed": user.is_superuser,
+            }
+        )
+
+        refresh = RefreshToken.for_user(user)
+        user_data = UserMeSerializer(user).data
+
+        return Response(
+            {
+                "message": "Login successful.",
+                "user": user_data,
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                },
+                "quota": QuotaService.get_quota_info(request),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class GoogleAuthView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = GoogleAuthSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"error": "Bad Request", "message": "Valid email is required for Google authentication.", "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"].lower().strip()
+        name = serializer.validated_data.get("name", "").strip()
+        google_id = serializer.validated_data.get("google_id", "").strip()
+        avatar_url = serializer.validated_data.get("avatar_url", "").strip()
+
+        user = User.objects.filter(email__iexact=email).first()
+        is_new = False
+        if not user:
+            is_new = True
+            base_name = "".join(c for c in (name.replace(" ", "").lower() if name else email.split("@")[0]) if c.isalnum() or c in ("_", "-")) or "google_user"
+            username = base_name
+            counter = 1
+            while User.objects.filter(username__iexact=username).exists():
+                username = f"{base_name}{counter}"
+                counter += 1
+
+            user = User.objects.create_user(username=username, email=email)
+            user.set_unusable_password()
+            user.save()
+
+        profile, _ = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "subscription_tier": UserProfile.TIER_PRO if user.is_superuser else UserProfile.TIER_FREE,
+                "is_subscribed": user.is_superuser,
+            }
+        )
+        if google_id and not profile.google_id:
+            profile.google_id = google_id
+        if avatar_url and not profile.avatar_url:
+            profile.avatar_url = avatar_url
+        profile.save()
+
+        refresh = RefreshToken.for_user(user)
+        user_data = UserMeSerializer(user).data
+
+        return Response(
+            {
+                "message": "Google authentication successful.",
+                "is_new_user": is_new,
+                "user": user_data,
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                },
+                "quota": QuotaService.get_quota_info(request),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class UserLinksListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        links_qs = URL.objects.filter(created_by=request.user).order_by("-created_at")
+        results = []
+        for u in links_qs[:100]:
+            click_count = LinkClick.objects.filter(short_code=u.short_code).count()
+            raw_url = request.build_absolute_uri(f"/{u.short_code}")
+            results.append({
+                "id": u.id,
+                "short_code": u.short_code,
+                "short_url": raw_url,
+                "formatted_short_url": raw_url,
+                "original_url": u.original_url,
+                "is_active": u.is_active,
+                "created_at": u.created_at.isoformat(),
+                "expires_at": u.expires_at.isoformat() if u.expires_at else None,
+                "total_clicks": click_count,
+            })
+        return Response({"count": len(results), "results": results})
+
+
+class UserUpgradeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        profile, _ = UserProfile.objects.get_or_create(
+            user=request.user,
+            defaults={"subscription_tier": UserProfile.TIER_FREE, "is_subscribed": False}
+        )
+        profile.subscription_tier = UserProfile.TIER_PRO
+        profile.is_subscribed = True
+        profile.save()
+
+        user_data = UserMeSerializer(request.user).data
+        quota_data = QuotaService.get_quota_info(request)
+
+        return Response({
+            "message": "Successfully upgraded to PicoLink Pro! You now have unlimited daily link creation.",
+            "user": user_data,
+            "quota": quota_data,
+        })
 
 
 class AdminURLListView(APIView):

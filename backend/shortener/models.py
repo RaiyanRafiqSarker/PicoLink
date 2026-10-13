@@ -54,3 +54,65 @@ class LinkClick(models.Model):
 
     def __str__(self):
         return f"Click on {self.short_code} at {self.clicked_at}"
+
+
+class UserProfile(models.Model):
+    TIER_FREE = "free"
+    TIER_PRO = "pro"
+    TIER_CHOICES = [
+        (TIER_FREE, "Free"),
+        (TIER_PRO, "Pro"),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    subscription_tier = models.CharField(max_length=20, choices=TIER_CHOICES, default=TIER_FREE)
+    is_subscribed = models.BooleanField(default=False)
+    google_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    avatar_url = models.URLField(max_length=1024, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "user_profiles"
+        verbose_name = "User Profile"
+        verbose_name_plural = "User Profiles"
+
+    def __str__(self):
+        return f"{self.user.username} [{self.subscription_tier}]"
+
+    @property
+    def is_pro(self) -> bool:
+        return self.is_subscribed or self.subscription_tier == self.TIER_PRO or self.user.is_superuser
+
+
+class DailyQuotaRecord(models.Model):
+    key = models.CharField(max_length=255, unique=True, db_index=True)
+    count = models.PositiveIntegerField(default=0)
+    date = models.DateField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "daily_quota_records"
+        verbose_name = "Daily Quota Record"
+        verbose_name_plural = "Daily Quota Records"
+
+    def __str__(self):
+        return f"{self.key}: {self.count}"
+
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=User)
+def create_or_save_user_profile(sender, instance, created, **kwargs):
+    if created:
+        tier = UserProfile.TIER_PRO if instance.is_superuser else UserProfile.TIER_FREE
+        UserProfile.objects.get_or_create(
+            user=instance,
+            defaults={
+                "subscription_tier": tier,
+                "is_subscribed": instance.is_superuser,
+            }
+        )

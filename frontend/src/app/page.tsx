@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Zap,
-  Shield,
   Activity,
   Copy,
   Check,
@@ -21,15 +20,38 @@ import {
   CheckCircle2,
   AlertTriangle,
   Layers,
-  ArrowRight
+  ArrowRight,
+  User,
+  LogIn,
+  LogOut,
+  Crown,
+  ChevronDown,
+  X,
+  Mail,
+  ShieldAlert,
+  Link as LinkIcon,
+  CheckCircle,
+  HelpCircle
 } from "lucide-react";
 
 interface ShortenResult {
   short_code: string;
   short_url: string;
+  formatted_short_url?: string;
   original_url: string;
   created_at: string;
   expires_at: string | null;
+  quota?: QuotaState;
+}
+
+interface QuotaState {
+  tier: "guest" | "free" | "pro";
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+  is_exhausted: boolean;
+  resets_at: string;
+  is_authenticated: boolean;
 }
 
 interface StatsData {
@@ -60,11 +82,51 @@ interface AdminUrlItem {
   total_clicks: number;
 }
 
+interface UserLinkItem {
+  id: number;
+  short_code: string;
+  short_url: string;
+  formatted_short_url?: string;
+  original_url: string;
+  is_active: boolean;
+  created_at: string;
+  expires_at: string | null;
+  total_clicks: number;
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Home() {
-  // Tab states
+  // Navigation tab states
   const [activeTab, setActiveTab] = useState<"shorten" | "analytics" | "admin">("shorten");
+
+  // User Authentication State
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<"login" | "signup">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authUsername, setAuthUsername] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
+  // Daily Link Quota State
+  const [quota, setQuota] = useState<QuotaState | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+
+  // Quota Gatekeeper / Upgrade Modal
+  const [quotaModalOpen, setQuotaModalOpen] = useState(false);
+  const [quotaModalTier, setQuotaModalTier] = useState<"guest" | "free">("guest");
+  const [quotaModalMessage, setQuotaModalMessage] = useState("");
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+
+  // User Modals: My Links & Account
+  const [myLinksModalOpen, setMyLinksModalOpen] = useState(false);
+  const [userLinks, setUserLinks] = useState<UserLinkItem[]>([]);
+  const [userLinksLoading, setUserLinksLoading] = useState(false);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
 
   // Shorten Form state
   const [urlInput, setUrlInput] = useState("");
@@ -81,9 +143,6 @@ export default function Home() {
   const [statsError, setStatsError] = useState("");
   const [statsData, setStatsData] = useState<StatsData | null>(null);
 
-  // Health state
-  const [healthStatus, setHealthStatus] = useState<any>(null);
-
   // Superuser Admin state
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [adminUser, setAdminUser] = useState<any>(null);
@@ -91,34 +150,266 @@ export default function Home() {
   const [loginPassword, setLoginPassword] = useState("admin123456");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
-
   const [adminUrls, setAdminUrls] = useState<AdminUrlItem[]>([]);
   const [adminUrlsLoading, setAdminUrlsLoading] = useState(false);
   const [adminSearch, setAdminSearch] = useState("");
 
-  // Check health on mount
+  // Initialize Auth & Quota on Mount
   useEffect(() => {
-    fetchHealth();
-    // Check saved token
-    const saved = localStorage.getItem("picolink_admin_token");
-    if (saved) {
-      setAdminToken(saved);
-      fetchAdminMe(saved);
+    const savedToken = localStorage.getItem("picolink_token");
+    if (savedToken) {
+      setAuthToken(savedToken);
+      fetchCurrentUser(savedToken);
+    } else {
+      fetchQuota(null);
+    }
+
+    // Superuser legacy token check
+    const savedAdmin = localStorage.getItem("picolink_admin_token");
+    if (savedAdmin) {
+      setAdminToken(savedAdmin);
+      fetchAdminMe(savedAdmin);
     }
   }, []);
 
-  const fetchHealth = async () => {
+  // Fetch quota for guest or authenticated user
+  const fetchQuota = async (token?: string | null) => {
+    setQuotaLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/healthz`);
+      const activeTok = token !== undefined ? token : authToken;
+      const headers: any = { "Content-Type": "application/json" };
+      if (activeTok) {
+        headers["Authorization"] = `Bearer ${activeTok}`;
+      }
+
+      const res = await fetch(`${API_BASE}/api/v1/user/quota`, { headers });
       if (res.ok) {
         const data = await res.json();
-        setHealthStatus(data);
+        setQuota(data);
       }
-    } catch {
-      setHealthStatus({ status: "offline", services: { postgres: "unknown", redis: "unknown" } });
+    } catch (err) {
+      console.error("Error fetching quota:", err);
+    } finally {
+      setQuotaLoading(false);
     }
   };
 
+  // Fetch current authenticated user
+  const fetchCurrentUser = async (token: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const user = await res.json();
+        setCurrentUser(user);
+        if (user.quota) {
+          setQuota(user.quota);
+        } else {
+          fetchQuota(token);
+        }
+      } else {
+        // Token expired
+        handleLogout();
+      }
+    } catch {
+      handleLogout();
+    }
+  };
+
+  // Auth: Email/Password Login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError("");
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username_or_email: authEmail,
+          password: authPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Login failed.");
+      }
+
+      const token = data.tokens.access;
+      setAuthToken(token);
+      localStorage.setItem("picolink_token", token);
+      if (data.tokens.refresh) {
+        localStorage.setItem("picolink_refresh_token", data.tokens.refresh);
+      }
+
+      setCurrentUser(data.user);
+      if (data.quota) setQuota(data.quota);
+      else fetchQuota(token);
+
+      setAuthModalOpen(false);
+      setAuthPassword("");
+    } catch (err: any) {
+      setAuthError(err.message || "Failed to log in.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Auth: Email/Password Sign Up
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError("");
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: authEmail,
+          password: authPassword,
+          username: authUsername || authEmail.split("@")[0],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Sign up failed.");
+      }
+
+      const token = data.tokens.access;
+      setAuthToken(token);
+      localStorage.setItem("picolink_token", token);
+      if (data.tokens.refresh) {
+        localStorage.setItem("picolink_refresh_token", data.tokens.refresh);
+      }
+
+      setCurrentUser(data.user);
+      if (data.quota) setQuota(data.quota);
+      else fetchQuota(token);
+
+      setAuthModalOpen(false);
+      setAuthPassword("");
+    } catch (err: any) {
+      setAuthError(err.message || "Failed to create account.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Auth: Continue with Google OAuth
+  const handleGoogleAuth = async () => {
+    setAuthLoading(true);
+    setAuthError("");
+
+    try {
+      // In a full Google OAuth client environment, this integrates with Google Identity Services.
+      // Here we process the Google OAuth exchange endpoint:
+      const googleEmail = authEmail.trim() || "alex.rivera@gmail.com";
+      const googleName = authUsername.trim() || "Alex Rivera";
+
+      const res = await fetch(`${API_BASE}/api/v1/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: googleEmail,
+          name: googleName,
+          google_id: `g_oauth_${Date.now()}`,
+          avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=128&q=80",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Google authentication failed.");
+      }
+
+      const token = data.tokens.access;
+      setAuthToken(token);
+      localStorage.setItem("picolink_token", token);
+      if (data.tokens.refresh) {
+        localStorage.setItem("picolink_refresh_token", data.tokens.refresh);
+      }
+
+      setCurrentUser(data.user);
+      if (data.quota) setQuota(data.quota);
+      else fetchQuota(token);
+
+      setAuthModalOpen(false);
+      setQuotaModalOpen(false);
+    } catch (err: any) {
+      setAuthError(err.message || "Google sign-in encountered an issue.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Auth: Log Out
+  const handleLogout = () => {
+    setAuthToken(null);
+    setCurrentUser(null);
+    localStorage.removeItem("picolink_token");
+    localStorage.removeItem("picolink_refresh_token");
+    setUserDropdownOpen(false);
+    fetchQuota(null);
+  };
+
+  // Upgrade user to Pro Tier
+  const handleUpgradeToPro = async () => {
+    if (!authToken) {
+      setQuotaModalOpen(false);
+      setAuthModalTab("signup");
+      setAuthModalOpen(true);
+      return;
+    }
+
+    setUpgradeLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/user/upgrade`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setCurrentUser(data.user);
+        setQuota(data.quota);
+        setQuotaModalOpen(false);
+        alert("🎉 Congratulations! You have been upgraded to PicoLink Pro with Unlimited Links!");
+      }
+    } catch (err) {
+      console.error("Upgrade error:", err);
+    } finally {
+      setUpgradeLoading(false);
+    }
+  };
+
+  // Fetch Links created by User
+  const fetchUserLinks = async () => {
+    if (!authToken) return;
+    setUserLinksLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/user/links`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserLinks(data.results || []);
+      }
+    } catch (err) {
+      console.error("Error fetching user links:", err);
+    } finally {
+      setUserLinksLoading(false);
+    }
+  };
+
+  // Shorten Action with Quota Enforcement
   const handleShorten = async (e: React.FormEvent) => {
     e.preventDefault();
     setShortenLoading(true);
@@ -126,22 +417,46 @@ export default function Home() {
     setShortenResult(null);
 
     try {
-      const payload: any = { original_url: urlInput };
+      const payload: any = { original_url: urlInput.trim() };
       if (slugInput.trim()) payload.custom_slug = slugInput.trim();
       if (expiresInput) payload.expires_in_days = parseInt(expiresInput, 10);
 
+      const headers: any = { "Content-Type": "application/json" };
+      if (authToken) {
+        headers["Authorization"] = `Bearer ${authToken}`;
+      }
+
       const res = await fetch(`${API_BASE}/api/v1/shorten`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
+
+      // Handle Quota Exceeded (HTTP 429)
+      if (res.status === 429) {
+        const isGuest = data.tier === "guest" || !currentUser;
+        setQuotaModalTier(isGuest ? "guest" : "free");
+        setQuotaModalMessage(
+          data.message ||
+          (isGuest
+            ? "You've reached your daily limit of 3 free links. Create a free account or Continue with Google to shorten up to 10 links per day."
+            : "You've reached your free daily limit of 10 links. Upgrade to Pro for unlimited daily shortening, custom aliases, and advanced analytics.")
+        );
+        if (data.details) setQuota(data.details);
+        setQuotaModalOpen(true);
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(data.message || data.error || "Failed to shorten link.");
       }
 
       setShortenResult(data);
+      if (data.quota) setQuota(data.quota);
+      else fetchQuota(authToken);
+
       setUrlInput("");
       setSlugInput("");
       setExpiresInput("");
@@ -180,6 +495,7 @@ export default function Home() {
     }
   };
 
+  // Superuser Admin logic
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
@@ -201,7 +517,7 @@ export default function Home() {
       await fetchAdminMe(data.access);
       await fetchAdminUrls(data.access);
     } catch (err: any) {
-      setLoginError(err.message || "Login failed.");
+      setLoginError(err.message || "Failed to authenticate.");
     } finally {
       setLoginLoading(false);
     }
@@ -213,32 +529,27 @@ export default function Home() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
-        setAdminUser(data);
-      } else {
-        handleAdminLogout();
+        const u = await res.json();
+        setAdminUser(u);
       }
     } catch {
       handleAdminLogout();
     }
   };
 
-  const fetchAdminUrls = async (token?: string, query: string = "") => {
-    const authToken = token || adminToken;
-    if (!authToken) return;
-
+  const fetchAdminUrls = async (token: string, search = "") => {
     setAdminUrlsLoading(true);
     try {
-      const url = `${API_BASE}/api/v1/admin/urls${query ? `?q=${encodeURIComponent(query)}` : ""}`;
+      const url = `${API_BASE}/api/v1/admin/urls${search ? `?q=${encodeURIComponent(search)}` : ""}`;
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         setAdminUrls(data.results || []);
       }
     } catch (err) {
-      console.error("Failed to load URLs", err);
+      console.error(err);
     } finally {
       setAdminUrlsLoading(false);
     }
@@ -248,7 +559,6 @@ export default function Home() {
     setAdminToken(null);
     setAdminUser(null);
     localStorage.removeItem("picolink_admin_token");
-    setAdminUrls([]);
   };
 
   const handleToggleUrlActive = async (id: number) => {
@@ -267,7 +577,8 @@ export default function Home() {
   };
 
   const handleDeleteUrl = async (id: number) => {
-    if (!adminToken || !confirm("Are you sure you want to permanently delete this shortened link?")) return;
+    if (!adminToken) return;
+    if (!confirm("Are you sure you want to delete this shortened URL?")) return;
     try {
       const res = await fetch(`${API_BASE}/api/v1/admin/urls/${id}`, {
         method: "DELETE",
@@ -282,122 +593,204 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080d1a] text-slate-100 flex flex-col justify-between">
-      {/* Ambient background glows */}
+    <div className="min-h-screen bg-[#080d1a] text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+      {/* Ambient background decorative glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px]"></div>
         <div className="absolute top-1/2 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[140px]"></div>
         <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px]"></div>
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 w-full">
-        {/* Navigation Bar */}
-        <header className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-8 mb-8 border-b border-slate-800">
+      {/* ========================================================= */}
+      {/* 1. TOP HEADER & NAVBAR REDESIGN                          */}
+      {/* ========================================================= */}
+      <header className="relative z-30 w-full bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/90 shadow-lg shadow-black/30">
+        <div className="max-w-6xl mx-auto px-4 py-3.5 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Brand & Tagline */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/10 shrink-0">
               <Zap className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
-                  PicoLink
-                </span>
-                <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Django + Next.js
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">PostgreSQL • Redis Cache-Aside • Base62 • Django Admin</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Health pill */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 text-xs">
-              <span className={`w-2 h-2 rounded-full ${healthStatus?.status === "ok" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}></span>
-              <span className="text-slate-300">
-                {healthStatus?.status === "ok" ? "Django API Online" : "Connecting..."}
+              <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent block leading-tight">
+                PicoLink
               </span>
+              <p className="text-xs text-slate-400 mt-0.5">Make Long Links Simple & Trackable</p>
             </div>
-
-            {/* Django Admin Direct Link */}
-            <a
-              href={`${API_BASE}/admin/`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              Django /admin
-              <ExternalLink className="w-3 h-3 ml-0.5" />
-            </a>
           </div>
-        </header>
 
-        {/* Tab Switcher */}
+          {/* Right Section: Quota Counter & Auth Controls */}
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            {/* Subtle Daily Link Counter Badge */}
+            {quota && (
+              <div
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border transition shadow-sm ${quota.tier === "pro"
+                    ? "bg-purple-950/40 border-purple-500/30 text-purple-300 font-semibold"
+                    : quota.tier === "free"
+                      ? "bg-indigo-950/40 border-indigo-500/30 text-indigo-300"
+                      : "bg-slate-950/70 border-slate-700/80 text-slate-300"
+                  }`}
+                title={`Resets daily at 00:00 UTC. Used: ${quota.used} links.`}
+              >
+                {quota.tier === "pro" ? (
+                  <>
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    <span>PRO • Unlimited Links</span>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={`w-2 h-2 rounded-full ${quota.remaining && quota.remaining > 0 ? "bg-emerald-400" : "bg-amber-400"
+                        }`}
+                    ></span>
+                    <span>
+                      Links left today:{" "}
+                      <strong className="text-white font-bold">
+                        {quota.remaining !== null ? quota.remaining : 0}/{quota.limit}
+                      </strong>
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Authenticated State: User Dropdown */}
+            {currentUser ? (
+              <div className="relative">
+                <button
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-white transition shadow-sm"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-[11px] font-bold text-white shadow-inner">
+                    {currentUser.username ? currentUser.username.substring(0, 1).toUpperCase() : "U"}
+                  </div>
+                  <span className="max-w-[120px] truncate">{currentUser.username || currentUser.email}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                {/* Dropdown Menu */}
+                {userDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50 animate-fade-in backdrop-blur-2xl">
+                    <div className="px-3 py-2 border-b border-slate-800/80 mb-1">
+                      <p className="text-[11px] text-slate-400 truncate">{currentUser.email}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${currentUser.is_pro || currentUser.subscription_tier === "pro"
+                              ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                              : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                            }`}
+                        >
+                          {currentUser.is_pro || currentUser.subscription_tier === "pro" ? "Pro Plan" : "Free Tier"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        fetchUserLinks();
+                        setMyLinksModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 transition"
+                    >
+                      <LinkIcon className="w-3.5 h-3.5 text-indigo-400" />
+                      My Links
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setAccountModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 transition"
+                    >
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      Account & Plan
+                    </button>
+
+                    <div className="my-1 border-t border-slate-800/80"></div>
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-rose-400 hover:bg-rose-500/10 transition"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Log Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Unauthenticated State: Sleek Login / Sign Up Button */
+              <button
+                onClick={() => {
+                  setAuthError("");
+                  setAuthModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition transform hover:-translate-y-0.5"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Login / Sign Up</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* ========================================================= */}
+      {/* 2. MAIN APPLICATION CONTENT                              */}
+      {/* ========================================================= */}
+      <main className="relative z-10 max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 w-full flex-1">
+        {/* Navigation Switcher Tabs */}
         <div className="flex items-center justify-center mb-8">
           <div className="inline-flex p-1 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl shadow-lg">
             <button
               onClick={() => setActiveTab("shorten")}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${
-                activeTab === "shorten"
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === "shorten"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                   : "text-slate-400 hover:text-slate-200"
-              }`}
+                }`}
             >
               <Sparkles className="w-4 h-4" />
               Link Studio
             </button>
             <button
               onClick={() => setActiveTab("analytics")}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${
-                activeTab === "analytics"
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === "analytics"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                   : "text-slate-400 hover:text-slate-200"
-              }`}
+                }`}
             >
               <BarChart3 className="w-4 h-4" />
               Analytics Inspector
             </button>
             <button
-              onClick={() => {
-                setActiveTab("admin");
-                if (adminToken) fetchAdminUrls(adminToken);
-              }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${
-                activeTab === "admin"
+              onClick={() => setActiveTab("admin")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === "admin"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                   : "text-slate-400 hover:text-slate-200"
-              }`}
+                }`}
             >
-              <Shield className="w-4 h-4" />
+              <Lock className="w-4 h-4" />
               Superuser Console
-              {adminUser?.is_superuser && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              )}
             </button>
           </div>
         </div>
 
-        {/* TAB 1: SHORTEN STUDIO */}
+        {/* ========================================== */}
+        {/* TAB 1: LINK CREATION STUDIO               */}
+        {/* ========================================== */}
         {activeTab === "shorten" && (
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl"></div>
+
               <div className="mb-6">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-indigo-400" />
-                  Shorten a URL
-                </h2>
-                <p className="text-sm text-slate-400 mt-1">
-                  High-speed Base62 sequential key generation with Redis cache-aside & SSRF firewall.
+                <h2 className="text-xl font-bold text-white">Create Short Link</h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  High-speed Base62 sequential key generation with Redis cache-aside &amp; SSRF firewall.
                 </p>
               </div>
-
-              {shortenError && (
-                <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-                  <span>{shortenError}</span>
-                </div>
-              )}
 
               <form onSubmit={handleShorten} className="space-y-4">
                 <div>
@@ -452,42 +845,52 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={shortenLoading}
-                  className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition disabled:opacity-50 mt-2"
+                  className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 disabled:opacity-50 text-sm mt-2"
                 >
                   {shortenLoading ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Shortening Link...
+                    </>
                   ) : (
                     <>
-                      <span>Generate Short Link</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4" />
+                      Generate Short URL
                     </>
                   )}
                 </button>
               </form>
 
-              {/* Result display */}
+              {shortenError && (
+                <div className="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
+                  <span>{shortenError}</span>
+                </div>
+              )}
+
+              {/* Shorten Result Card */}
               {shortenResult && (
-                <div className="mt-8 p-5 bg-indigo-950/30 border border-indigo-500/30 rounded-xl animate-fade-in">
+                <div className="mt-6 p-5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 animate-fade-in">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs uppercase font-bold tracking-wider text-indigo-400 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      Shortened Successfully
+                      Ready to share!
                     </span>
-                    <span className="text-xs text-slate-400 font-mono">
-                      Code: {shortenResult.short_code}
-                    </span>
+                    <span className="text-xs font-mono text-slate-400">/{shortenResult.short_code}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-lg p-2 px-3">
+                  <div className="flex items-center gap-2 p-2.5 bg-slate-950/80 rounded-xl border border-slate-800">
                     <input
                       type="text"
                       readOnly
                       value={shortenResult.short_url}
-                      className="bg-transparent border-none text-white text-sm font-mono focus:outline-none flex-1 truncate"
+                      className="bg-transparent text-sm font-mono text-indigo-200 w-full focus:outline-none px-2 select-all"
                     />
                     <button
-                      onClick={() => copyToClipboard(shortenResult.short_url)}
-                      className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1 transition"
+                      onClick={() =>
+                        copyToClipboard(shortenResult.short_url)
+                      }
+                      className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
                     >
                       {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       {copied ? "Copied!" : "Copy"}
@@ -496,10 +899,10 @@ export default function Home() {
                       href={shortenResult.short_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="p-1.5 text-slate-400 hover:text-white transition"
-                      title="Open Link"
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                      title="Test redirection"
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>
 
@@ -522,7 +925,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* TAB 2: ANALYTICS INSPECTOR */}
+        {/* ========================================== */}
+        {/* TAB 2: ANALYTICS INSPECTOR                 */}
+        {/* ========================================== */}
         {activeTab === "analytics" && (
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl">
@@ -686,7 +1091,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* TAB 3: SUPERUSER CONSOLE */}
+        {/* ========================================== */}
+        {/* TAB 3: SUPERUSER CONSOLE                   */}
+        {/* ========================================== */}
         {activeTab === "admin" && (
           <div className="max-w-5xl mx-auto space-y-6">
             {!adminToken ? (
@@ -758,7 +1165,7 @@ export default function Home() {
                           Superuser Verified
                         </span>
                       </div>
-                      <span className="text-xs text-slate-400">Manage all URLs, system killswitches & Redis cache</span>
+                      <span className="text-xs text-slate-400">Manage all URLs, system killswitches &amp; Redis cache</span>
                     </div>
                   </div>
 
@@ -842,11 +1249,10 @@ export default function Home() {
                               </td>
                               <td className="py-3 px-3">
                                 <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    u.is_active
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${u.is_active
                                       ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
                                       : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
-                                  }`}
+                                    }`}
                                 >
                                   {u.is_active ? "ACTIVE" : "DISABLED"}
                                 </span>
@@ -855,11 +1261,10 @@ export default function Home() {
                                 <div className="inline-flex items-center gap-1.5">
                                   <button
                                     onClick={() => handleToggleUrlActive(u.id)}
-                                    className={`p-1.5 rounded-md border text-xs transition ${
-                                      u.is_active
+                                    className={`p-1.5 rounded-md border text-xs transition ${u.is_active
                                         ? "bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20"
                                         : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20"
-                                    }`}
+                                      }`}
                                     title={u.is_active ? "Disable link" : "Enable link"}
                                   >
                                     <Power className="w-3.5 h-3.5" />
@@ -884,11 +1289,460 @@ export default function Home() {
             )}
           </div>
         )}
-      </div>
+      </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
-        PicoLink Engine • Built with Django 6, Django REST Framework, SimpleJWT, Next.js 15, and Tailwind CSS.
+      {/* ========================================================= */}
+      {/* 3. MODAL: AUTHENTICATION (LOG IN / SIGN UP / GOOGLE)     */}
+      {/* ========================================================= */}
+      {authModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden">
+            <button
+              onClick={() => setAuthModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-500/25">
+                <Zap className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {authModalTab === "login" ? "Welcome back to PicoLink" : "Create your PicoLink account"}
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                {authModalTab === "login"
+                  ? "Log in to track your links and access your daily quota."
+                  : "Sign up free to get up to 10 daily links, custom slugs & analytics."}
+              </p>
+            </div>
+
+            {/* Google OAuth Button */}
+            <button
+              onClick={handleGoogleAuth}
+              disabled={authLoading}
+              className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-slate-900 font-semibold rounded-xl text-xs transition shadow flex items-center justify-center gap-3 mb-5 disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+
+            <div className="relative flex items-center justify-center mb-5">
+              <div className="border-t border-slate-800 w-full"></div>
+              <span className="bg-slate-900 px-3 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                or with email
+              </span>
+            </div>
+
+            {/* Tab switch: Log In vs Sign Up */}
+            <div className="flex p-1 bg-slate-950 rounded-xl mb-4 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthModalTab("login");
+                  setAuthError("");
+                }}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${authModalTab === "login" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-white"
+                  }`}
+              >
+                Log In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthModalTab("signup");
+                  setAuthError("");
+                }}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${authModalTab === "signup" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-white"
+                  }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            {authError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <form onSubmit={authModalTab === "login" ? handleLogin : handleRegister} className="space-y-3.5">
+              {authModalTab === "signup" && (
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase text-slate-300 mb-1">Username (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. dev_sarah"
+                    value={authUsername}
+                    onChange={(e) => setAuthUsername(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-semibold uppercase text-slate-300 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="you@domain.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold uppercase text-slate-300 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+              >
+                {authLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : authModalTab === "login" ? (
+                  "Sign In"
+                ) : (
+                  "Create Free Account"
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 4. MODAL: QUOTA GATEKEEPER / UPGRADE TRIGGER (HTTP 429)  */}
+      {/* ========================================================= */}
+      {quotaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden">
+            <button
+              onClick={() => setQuotaModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {quotaModalTier === "guest" ? (
+              /* Tier 1 UX: GUEST LIMIT REACHED (3 LINKS) */
+              <div className="text-center">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-4">
+                  <ShieldAlert className="w-7 h-7" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Daily Guest Limit Reached</h3>
+                <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto mb-6">
+                  {quotaModalMessage ||
+                    "You've reached your daily limit of 3 free links. Create a free account or Continue with Google to shorten up to 10 links per day."}
+                </p>
+
+                <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-left mb-6 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <span className="text-rose-400 font-bold">✕</span> Guest Tier: 3 links/day (Exhausted)
+                  </div>
+                  <div className="flex items-center gap-2 text-emerald-400 font-medium">
+                    <span>✓</span> Free Account: <strong>10 links/day</strong> + Dashboard &amp; Analytics
+                  </div>
+                  <div className="flex items-center gap-2 text-purple-400 font-medium">
+                    <span>✓</span> Pro Subscriber: <strong>Unlimited links</strong> + Custom slugs
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleGoogleAuth}
+                    disabled={authLoading}
+                    className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-slate-900 font-semibold rounded-xl text-xs transition shadow flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Continue with Google &amp; Get 10 Links</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setQuotaModalOpen(false);
+                      setAuthModalTab("signup");
+                      setAuthModalOpen(true);
+                    }}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-indigo-600/30"
+                  >
+                    Create Free Account (Email &amp; Password)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Tier 2 UX: FREE REGISTERED USER LIMIT REACHED (10 LINKS) */
+              <div className="text-center">
+                <div className="w-14 h-14 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-7 h-7 text-amber-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Free Daily Limit Reached</h3>
+                <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto mb-6">
+                  {quotaModalMessage ||
+                    "You've reached your free daily limit of 10 links. Upgrade to Pro for unlimited daily shortening, custom aliases, and advanced analytics."}
+                </p>
+
+                <div className="p-4 bg-slate-950 rounded-2xl border border-purple-500/30 text-left mb-6 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <span className="text-rose-400 font-bold">✕</span> 10/10 Free links used today (Resets at 00:00 UTC)
+                  </div>
+                  <div className="flex items-center gap-2 text-purple-300 font-semibold">
+                    <Crown className="w-3.5 h-3.5 text-amber-400" /> Pro Tier: <strong>Unlimited Daily Shortening</strong>
+                  </div>
+                  <div className="flex items-center gap-2 text-indigo-300">
+                    <span>✓</span> Branded Custom Slugs &amp; Zero Expiration Caps
+                  </div>
+                  <div className="flex items-center gap-2 text-indigo-300">
+                    <span>✓</span> Real-Time Click Logs &amp; Geolocation Map
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleUpgradeToPro}
+                    disabled={upgradeLoading}
+                    className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {upgradeLoading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Crown className="w-4 h-4 text-amber-300" />
+                        <span>Upgrade to Pro (Unlimited Links)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setQuotaModalOpen(false)}
+                    className="w-full py-2.5 text-slate-400 hover:text-white text-xs transition"
+                  >
+                    Maybe Tomorrow
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 5. MODAL: "MY LINKS" REPOSITORY                           */}
+      {/* ========================================================= */}
+      {myLinksModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col">
+            <button
+              onClick={() => setMyLinksModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+                <LinkIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">My Shortened Links</h3>
+                <p className="text-xs text-slate-400">View and inspect links created from your account</p>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {userLinksLoading ? (
+                <div className="py-12 text-center text-slate-400">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-400" />
+                  Loading your links...
+                </div>
+              ) : userLinks.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-xs">
+                  No links created under this account yet. Shorten your first link above!
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-800/80">
+                  {userLinks.map((item) => (
+                    <div key={item.id} className="py-3 flex items-center justify-between gap-4">
+                      <div className="truncate max-w-[400px]">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-indigo-300 text-xs">
+                            /{item.short_code}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-semibold">
+                            {item.total_clicks} clicks
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5 font-mono">
+                          {item.original_url}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() =>
+                            copyToClipboard(item.short_url)
+                          }
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs flex items-center gap-1 transition"
+                          title="Copy link"
+                        >
+                          <Copy className="w-3 h-3" />
+                          Copy
+                        </button>
+                        <a
+                          href={item.short_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                          title="Visit link"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 6. MODAL: "ACCOUNT & PLAN"                                */}
+      {/* ========================================================= */}
+      {accountModalOpen && currentUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden">
+            <button
+              onClick={() => setAccountModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white mx-auto mb-3 shadow-lg shadow-indigo-500/25">
+                {currentUser.username ? currentUser.username.substring(0, 1).toUpperCase() : "U"}
+              </div>
+              <h3 className="text-lg font-bold text-white">{currentUser.username}</h3>
+              <p className="text-xs text-slate-400">{currentUser.email}</p>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 mb-6 space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Subscription Tier</span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${currentUser.is_pro || currentUser.subscription_tier === "pro"
+                      ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                      : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                    }`}
+                >
+                  {currentUser.is_pro || currentUser.subscription_tier === "pro" ? "Pro (Unlimited)" : "Free (10/day)"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Today's Remaining</span>
+                <span className="font-bold text-white">
+                  {quota?.tier === "pro" ? "Unlimited" : `${quota?.remaining ?? 0} / ${quota?.limit ?? 10}`}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Daily Reset Time</span>
+                <span className="font-mono text-slate-300 text-[11px]">00:00 UTC</span>
+              </div>
+            </div>
+
+            {!currentUser.is_pro && currentUser.subscription_tier !== "pro" ? (
+              <button
+                onClick={handleUpgradeToPro}
+                disabled={upgradeLoading}
+                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {upgradeLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Crown className="w-4 h-4 text-amber-300" />
+                    <span>Upgrade to Pro Plan (Instant)</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-500/30 text-center text-xs text-purple-300 flex items-center justify-center gap-2">
+                <Crown className="w-4 h-4 text-amber-400" />
+                <span>You have active Pro status with unlimited shortening.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 7. DISTINCT BOTTOM FOOTER BAR                            */}
+      {/* ========================================================= */}
+      <footer className="relative z-20 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/90 py-5 mt-12 shadow-2xl">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-white font-bold tracking-wide">PicoLink</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-300">
+              Powered by <span className="text-indigo-400 font-semibold">Raktch Technology &amp; Software.</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500/80"></span>
+            <span>Enterprise URL Shortener</span>
+          </div>
+        </div>
       </footer>
     </div>
   );

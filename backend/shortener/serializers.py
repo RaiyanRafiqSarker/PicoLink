@@ -33,16 +33,20 @@ class ShortenRequestSerializer(serializers.Serializer):
 
 class URLResponseSerializer(serializers.ModelSerializer):
     short_url = serializers.SerializerMethodField()
+    formatted_short_url = serializers.SerializerMethodField()
 
     class Meta:
         model = URL
-        fields = ["short_code", "short_url", "original_url", "created_at", "expires_at", "is_active"]
+        fields = ["short_code", "short_url", "formatted_short_url", "original_url", "created_at", "expires_at", "is_active"]
 
     def get_short_url(self, obj):
         request = self.context.get("request")
         if request:
             return request.build_absolute_uri(f"/{obj.short_code}")
         return f"http://localhost:8000/{obj.short_code}"
+
+    def get_formatted_short_url(self, obj):
+        return self.get_short_url(obj)
 
 
 class StatsResponseSerializer(serializers.Serializer):
@@ -64,3 +68,42 @@ class UserMeSerializer(serializers.Serializer):
     email = serializers.CharField()
     is_superuser = serializers.BooleanField()
     is_staff = serializers.BooleanField()
+    subscription_tier = serializers.SerializerMethodField()
+    is_subscribed = serializers.SerializerMethodField()
+    is_pro = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
+
+    def get_subscription_tier(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.subscription_tier if profile else ("pro" if obj.is_superuser else "free")
+
+    def get_is_subscribed(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.is_subscribed if profile else obj.is_superuser
+
+    def get_is_pro(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.is_pro if profile else obj.is_superuser
+
+    def get_avatar_url(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.avatar_url if profile and profile.avatar_url else ""
+
+
+class UserRegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, min_length=6, write_only=True)
+    username = serializers.CharField(required=False, allow_blank=True, max_length=150)
+
+
+class UserLoginSerializer(serializers.Serializer):
+    username_or_email = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
+
+
+class GoogleAuthSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    name = serializers.CharField(required=False, allow_blank=True, default="")
+    google_id = serializers.CharField(required=False, allow_blank=True, default="")
+    avatar_url = serializers.URLField(required=False, allow_blank=True, default="")
+    credential = serializers.CharField(required=False, allow_blank=True, default="")
