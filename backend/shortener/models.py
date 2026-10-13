@@ -35,6 +35,12 @@ class URL(models.Model):
         return False
 
 
+class LinkClickQuerySet(models.QuerySet):
+    def human(self):
+        """Clicks from real visitors, excluding crawlers, preview bots and scripts."""
+        return self.filter(is_bot=False)
+
+
 class LinkClick(models.Model):
     id = models.BigAutoField(primary_key=True)
     short_code = models.CharField(max_length=50, db_index=True)
@@ -42,6 +48,9 @@ class LinkClick(models.Model):
     referrer = models.CharField(max_length=500, null=True, blank=True)
     user_agent = models.TextField(null=True, blank=True)
     country_code = models.CharField(max_length=10, null=True, blank=True)
+    is_bot = models.BooleanField(default=False, db_index=True)
+
+    objects = LinkClickQuerySet.as_manager()
 
     class Meta:
         db_table = "link_clicks"

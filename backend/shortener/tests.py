@@ -8,6 +8,7 @@ from shortener.models import URL, LinkClick
 from shortener.utils.base62 import encode_base62, decode_base62, SEQUENCE_OFFSET
 from shortener.utils.ssrf import validate_url_safety, is_slug_reserved
 from shortener.utils.analytics import parse_user_agent, referrer_source
+from shortener.utils.bots import is_bot_user_agent
 
 User = get_user_model()
 
@@ -261,3 +262,69 @@ class UserLinkEditTestCase(TestCase):
         URL.objects.filter(pk=self.link.pk).update(expires_at=timezone.now() - timedelta(days=1))
         results = self.client.get("/api/v1/user/links", **self.auth(self.owner)).json()["results"]
         self.assertEqual(results[0]["is_expired"], True)
+
+
+class BotFilteringTestCase(TestCase):
+    REQUIRED_BOTS = [
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+        "Twitterbot/1.0",
+        "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+        "LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)",
+        "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+    ]
+    HUMANS = [
+        AnalyticsTestCase.IPHONE_SAFARI,
+        AnalyticsTestCase.WINDOWS_EDGE,
+        AnalyticsTestCase.WINDOWS_CHROME,
+        AnalyticsTestCase.ANDROID_TABLET,
+        # Phone brand containing "bot" must not be flagged
+        "Mozilla/5.0 (Linux; Android 10; CUBOT X30) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36",
+    ]
+
+    def setUp(self):
+        URL.objects.create(original_url="https://python.org", short_code="botcheck")
+
+    def test_detects_required_bots_and_spares_humans(self):
+        for ua in self.REQUIRED_BOTS:
+            self.assertTrue(is_bot_user_agent(ua), ua)
+        for ua in self.HUMANS:
+            self.assertFalse(is_bot_user_agent(ua), ua)
+        self.assertFalse(is_bot_user_agent(None))
+        self.assertFalse(is_bot_user_agent(""))
+
+    def test_worker_flags_bots_before_writing(self):
+        from shortener.worker import ClickConsumerWorker
+
+        worker = ClickConsumerWorker()
+        now = timezone.now().isoformat()
+        worker.buffer = [
+            {"short_code": "botcheck", "clicked_at": now, "user_agent": ua, "referrer": ""}
+            for ua in self.REQUIRED_BOTS + self.HUMANS[:2]
+        ]
+        worker.flush()
+
+        self.assertEqual(LinkClick.objects.filter(short_code="botcheck").count(), 8)
+        self.assertEqual(LinkClick.objects.filter(short_code="botcheck", is_bot=True).count(), 6)
+        self.assertEqual(LinkClick.objects.human().filter(short_code="botcheck").count(), 2)
+        self.assertEqual(worker.buffer, [])
+
+    def test_redirect_fallback_flags_bots_and_still_redirects(self):
+        resp = self.client.get("/botcheck", HTTP_USER_AGENT=self.REQUIRED_BOTS[0])
+        self.assertEqual(resp.status_code, 302)
+        self.client.get("/botcheck", HTTP_USER_AGENT=self.HUMANS[0])
+
+        flags = list(LinkClick.objects.filter(short_code="botcheck").order_by("id").values_list("is_bot", flat=True))
+        self.assertEqual(flags, [True, False])
+
+    def test_dashboards_only_count_human_clicks(self):
+        for ua in self.REQUIRED_BOTS:
+            LinkClick.objects.create(short_code="botcheck", user_agent=ua, is_bot=True)
+        LinkClick.objects.create(short_code="botcheck", user_agent=self.HUMANS[0])
+
+        stats = self.client.get("/api/v1/stats/botcheck").json()
+        self.assertEqual(stats["total_clicks"], 1)
+        self.assertEqual(stats["bot_clicks"], 6)
+        self.assertEqual(sum(d["count"] for d in stats["clicks_last_7_days"]), 1)
+        self.assertEqual(stats["device_breakdown"], [{"name": "Mobile", "count": 1, "percentage": 100.0}])
+        self.assertEqual(len(stats["recent_clicks"]), 1)

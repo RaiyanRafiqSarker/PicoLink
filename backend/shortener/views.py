@@ -24,6 +24,7 @@ from .serializers import (
 )
 from .utils.base62 import encode_base62, SEQUENCE_OFFSET
 from .utils.analytics import daily_click_series, referrer_and_device_breakdowns
+from .utils.bots import is_bot_user_agent
 from .redis_client import redis_client
 from .services.quota import QuotaService
 
@@ -224,22 +225,22 @@ class RedirectView(APIView):
             "ip": get_client_ip(request),
         }
 
-        if redis_client:
-            try:
-                redis_client.lpush("click_events", json.dumps(click_payload))
-            except Exception:
-                # If Redis queue is down, directly persist to DB
-                LinkClick.objects.create(
-                    short_code=code,
-                    referrer=click_payload["referrer"] or None,
-                    user_agent=click_payload["user_agent"] or None,
-                )
-        else:
+        def save_click_directly():
+            # Fallback when the Redis queue is unavailable; flags bots the same way the worker does
             LinkClick.objects.create(
                 short_code=code,
                 referrer=click_payload["referrer"] or None,
                 user_agent=click_payload["user_agent"] or None,
+                is_bot=is_bot_user_agent(click_payload["user_agent"]),
             )
+
+        if redis_client:
+            try:
+                redis_client.lpush("click_events", json.dumps(click_payload))
+            except Exception:
+                save_click_directly()
+        else:
+            save_click_directly()
 
         return HttpResponseRedirect(target_url, status=302)
 
@@ -255,8 +256,10 @@ class StatsView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        clicks_qs = LinkClick.objects.filter(short_code=code)
+        all_clicks_qs = LinkClick.objects.filter(short_code=code)
+        clicks_qs = all_clicks_qs.human()
         total_clicks = clicks_qs.count()
+        bot_clicks = all_clicks_qs.filter(is_bot=True).count()
 
         # Top referrers
         top_referrers_qs = (
@@ -313,6 +316,7 @@ class StatsView(APIView):
             "expires_at": url_obj.expires_at.isoformat() if url_obj.expires_at else None,
             "is_active": url_obj.is_active,
             "total_clicks": total_clicks,
+            "bot_clicks": bot_clicks,
             "top_referrers": top_referrers,
             "country_breakdown": country_breakdown,
             "clicks_over_time": clicks_over_time,
@@ -525,7 +529,7 @@ def serialize_user_link(request, u: URL) -> dict:
         "is_expired": u.is_expired,
         "created_at": u.created_at.isoformat(),
         "expires_at": u.expires_at.isoformat() if u.expires_at else None,
-        "total_clicks": LinkClick.objects.filter(short_code=u.short_code).count(),
+        "total_clicks": LinkClick.objects.human().filter(short_code=u.short_code).count(),
     }
 
 
@@ -607,7 +611,7 @@ class AdminURLListView(APIView):
 
         data = []
         for u in urls_qs[:100]:
-            click_count = LinkClick.objects.filter(short_code=u.short_code).count()
+            click_count = LinkClick.objects.human().filter(short_code=u.short_code).count()
             data.append({
                 "id": u.id,
                 "short_code": u.short_code,

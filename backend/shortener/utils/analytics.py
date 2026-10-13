@@ -7,6 +7,8 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 
+from .bots import is_bot_user_agent
+
 # Hostname suffix -> friendly source name (checked in order)
 REFERRER_SOURCES = [
     (("t.co", "twitter.com", "x.com"), "Twitter / X"),
@@ -22,7 +24,6 @@ REFERRER_SOURCES = [
     (("duckduckgo.com",), "DuckDuckGo"),
 ]
 
-BOT_PATTERN = re.compile(r"bot|crawl|spider|slurp|curl|wget|python-requests|httpclient|facebookexternalhit", re.I)
 
 
 def referrer_source(referrer: str | None) -> str:
@@ -44,7 +45,7 @@ def parse_user_agent(user_agent: str | None) -> tuple[str, str]:
     """Return (device, browser) for a User-Agent string, e.g. ("Mobile", "Safari")."""
     if not user_agent:
         return "Unknown", "Unknown"
-    if BOT_PATTERN.search(user_agent):
+    if is_bot_user_agent(user_agent):
         return "Bot", "Bot"
 
     if re.search(r"iPad|Tablet", user_agent) or ("Android" in user_agent and "Mobile" not in user_agent):

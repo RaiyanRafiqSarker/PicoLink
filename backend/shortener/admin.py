@@ -24,9 +24,9 @@ class URLAdmin(admin.ModelAdmin):
     display_original_url.short_description = "Original URL"
 
     def click_count_display(self, obj):
-        count = LinkClick.objects.filter(short_code=obj.short_code).count()
+        count = LinkClick.objects.human().filter(short_code=obj.short_code).count()
         return format_html("<strong>{}</strong> clicks", count)
-    click_count_display.short_description = "Total Clicks"
+    click_count_display.short_description = "Total Clicks (excl. bots)"
 
     @admin.action(description="Activate selected shortened URLs")
     def activate_urls(self, request, queryset):
@@ -46,10 +46,11 @@ class LinkClickAdmin(admin.ModelAdmin):
         "country_code",
         "referrer_display",
         "user_agent_truncated",
+        "is_bot",
     )
-    list_filter = ("country_code", "clicked_at")
+    list_filter = ("is_bot", "country_code", "clicked_at")
     search_fields = ("short_code", "referrer", "user_agent")
-    readonly_fields = ("id", "short_code", "clicked_at", "referrer", "user_agent", "country_code")
+    readonly_fields = ("id", "short_code", "clicked_at", "referrer", "user_agent", "country_code", "is_bot")
 
     def referrer_display(self, obj):
         return obj.referrer or "Direct / None"

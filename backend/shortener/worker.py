@@ -15,6 +15,7 @@ from django.conf import settings
 from django.utils import timezone
 from shortener.models import LinkClick
 from shortener.redis_client import redis_client
+from shortener.utils.bots import is_bot_user_agent
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("ClickWorker")
@@ -39,8 +40,14 @@ class ClickConsumerWorker:
             return
         
         count = len(self.buffer)
+        bot_count = 0
         records_to_insert = []
         for item in self.buffer:
+            user_agent = item.get("user_agent") or None
+            # Keep bot hits for auditing, but flag them so dashboards only count real visitors
+            is_bot = is_bot_user_agent(user_agent)
+            bot_count += is_bot
+
             # Parse clicked_at
             clicked_at = timezone.now()
             if "clicked_at" in item:
@@ -54,14 +61,18 @@ class ClickConsumerWorker:
                     short_code=item.get("short_code", ""),
                     clicked_at=clicked_at,
                     referrer=item.get("referrer") or None,
-                    user_agent=item.get("user_agent") or None,
+                    user_agent=user_agent,
                     country_code=item.get("country_code") or None,
+                    is_bot=is_bot,
                 )
             )
 
         try:
             LinkClick.objects.bulk_create(records_to_insert, batch_size=100)
-            logger.info(f"Successfully bulk-inserted {count} click records into PostgreSQL.")
+            logger.info(
+                f"Successfully bulk-inserted {count} click records into PostgreSQL "
+                f"({bot_count} flagged as bots)."
+            )
         except Exception as e:
             logger.error(f"Failed to bulk-insert click batch: {e}")
         finally:

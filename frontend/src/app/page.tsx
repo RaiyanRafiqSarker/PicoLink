@@ -117,6 +117,7 @@ interface StatsData {
   created_at: string;
   expires_at: string | null;
   total_clicks: number;
+  bot_clicks?: number;
   top_referrers: Array<{ referrer: string; count: number }>;
   country_breakdown: Array<{ country_code: string; count: number }>;
   clicks_over_time: Array<{ date: string; count: number }>;
@@ -1235,7 +1236,12 @@ export default function Home() {
                   <div className="p-5 bg-slate-900/60 border border-slate-800 rounded-xl">
                     <span className="text-xs uppercase font-bold tracking-wider text-slate-400">Total Clicks</span>
                     <div className="text-3xl font-black text-white mt-1">{statsData.total_clicks}</div>
-                    <span className="text-xs text-emerald-400 mt-1 inline-block">Real-time aggregate</span>
+                    <span className="text-xs text-emerald-400 mt-1 inline-block">Real visitors only</span>
+                    {!!statsData.bot_clicks && (
+                      <span className="block text-[11px] text-slate-500 mt-0.5">
+                        {statsData.bot_clicks} bot {statsData.bot_clicks === 1 ? "visit" : "visits"} excluded
+                      </span>
+                    )}
                   </div>
 
                   <div className="p-5 bg-slate-900/60 border border-slate-800 rounded-xl">
