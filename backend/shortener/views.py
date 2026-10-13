@@ -19,6 +19,7 @@ from .serializers import (
     UserRegisterSerializer,
     UserLoginSerializer,
     GoogleAuthSerializer,
+    get_slug_unavailable_reason,
 )
 from .utils.base62 import encode_base62, SEQUENCE_OFFSET
 from .redis_client import redis_client
@@ -149,6 +150,15 @@ class ShortenView(APIView):
         res_data = dict(out_serializer.data)
         res_data["quota"] = QuotaService.get_quota_info(request)
         return Response(res_data, status=status.HTTP_201_CREATED)
+
+
+class SlugAvailabilityView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        slug = request.query_params.get("slug", "").strip()
+        reason = get_slug_unavailable_reason(slug)
+        return Response({"slug": slug, "available": reason is None, "reason": reason})
 
 
 class RedirectView(APIView):

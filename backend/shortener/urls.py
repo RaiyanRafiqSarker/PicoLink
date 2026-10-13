@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import (
     ShortenView,
+    SlugAvailabilityView,
     StatsView,
     HealthzView,
     CurrentUserView,
@@ -19,6 +20,7 @@ from .views import (
 urlpatterns = [
     # Shorten & Stats
     path("v1/shorten", ShortenView.as_view(), name="api-shorten"),
+    path("v1/shorten/check-slug/", SlugAvailabilityView.as_view(), name="api-check-slug"),
     path("v1/stats/<str:code>", StatsView.as_view(), name="api-stats"),
 
     # Auth routes

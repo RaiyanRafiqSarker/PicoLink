@@ -7,6 +7,17 @@ from .utils.ssrf import validate_url_safety, is_slug_reserved
 
 SLUG_REGEX = re.compile(r"^[a-zA-Z0-9_-]{3,50}$")
 
+
+def get_slug_unavailable_reason(slug: str) -> str | None:
+    """Return why a custom slug can't be used ("invalid", "reserved", "taken"), or None if it's free."""
+    if not SLUG_REGEX.match(slug):
+        return "invalid"
+    if is_slug_reserved(slug):
+        return "reserved"
+    if URL.objects.filter(short_code=slug).exists():
+        return "taken"
+    return None
+
 class ShortenRequestSerializer(serializers.Serializer):
     original_url = serializers.CharField(max_length=2048)
     custom_slug = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
@@ -22,11 +33,12 @@ class ShortenRequestSerializer(serializers.Serializer):
         if not value:
             return ""
         val = value.strip()
-        if not SLUG_REGEX.match(val):
+        reason = get_slug_unavailable_reason(val)
+        if reason == "invalid":
             raise serializers.ValidationError("Slug must be 3-50 characters long and contain only letters, numbers, hyphens, or underscores.")
-        if is_slug_reserved(val):
+        if reason == "reserved":
             raise serializers.ValidationError(f'The custom slug "{val}" is reserved for system routes.')
-        if URL.objects.filter(short_code=val).exists():
+        if reason == "taken":
             raise serializers.ValidationError(f'The custom slug "{val}" is already taken.')
         return val
 

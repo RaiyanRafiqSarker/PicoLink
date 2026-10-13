@@ -73,6 +73,30 @@ class ShortenerAPITestCase(TestCase):
         )
         self.assertEqual(resp.status_code, 400)
 
+    def test_check_slug_available(self):
+        resp = self.client.get("/api/v1/shorten/check-slug/", {"slug": "fresh-slug"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["available"], True)
+
+    def test_check_slug_taken(self):
+        self.client.post(
+            "/api/v1/shorten",
+            data={"original_url": "https://python.org", "custom_slug": "taken-slug"},
+            content_type="application/json",
+        )
+        resp = self.client.get("/api/v1/shorten/check-slug/", {"slug": "taken-slug"})
+        self.assertEqual(resp.json(), {"slug": "taken-slug", "available": False, "reason": "taken"})
+
+    def test_check_slug_reserved_and_invalid(self):
+        resp = self.client.get("/api/v1/shorten/check-slug/", {"slug": "Admin"})
+        self.assertEqual(resp.json()["reason"], "reserved")
+        self.assertFalse(resp.json()["available"])
+
+        for bad in ["", "ab", "has space", "a" * 51]:
+            resp = self.client.get("/api/v1/shorten/check-slug/", {"slug": bad})
+            self.assertFalse(resp.json()["available"], bad)
+            self.assertEqual(resp.json()["reason"], "invalid", bad)
+
     def test_redirect_and_stats(self):
         # Shorten
         shorten_resp = self.client.post(

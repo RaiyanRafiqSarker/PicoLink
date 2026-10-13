@@ -131,6 +131,7 @@ export default function Home() {
   // Shorten Form state
   const [urlInput, setUrlInput] = useState("");
   const [slugInput, setSlugInput] = useState("");
+  const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [expiresInput, setExpiresInput] = useState("");
   const [shortenLoading, setShortenLoading] = useState(false);
   const [shortenError, setShortenError] = useState("");
@@ -153,6 +154,30 @@ export default function Home() {
   const [adminUrls, setAdminUrls] = useState<AdminUrlItem[]>([]);
   const [adminUrlsLoading, setAdminUrlsLoading] = useState(false);
   const [adminSearch, setAdminSearch] = useState("");
+
+  // Debounced (300ms) custom slug availability check
+  useEffect(() => {
+    const slug = slugInput.trim();
+    if (!slug) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/v1/shorten/check-slug/?slug=${encodeURIComponent(slug)}`,
+          { signal: controller.signal }
+        );
+        const data = await res.json();
+        if (data.available) setSlugStatus("available");
+        else setSlugStatus(data.reason === "invalid" ? "invalid" : "taken");
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") setSlugStatus("idle");
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [slugInput]);
 
   // Initialize Auth & Quota on Mount
   useEffect(() => {
@@ -459,6 +484,7 @@ export default function Home() {
 
       setUrlInput("");
       setSlugInput("");
+      setSlugStatus("idle");
       setExpiresInput("");
     } catch (err: any) {
       setShortenError(err.message || "An unexpected error occurred.");
@@ -818,10 +844,27 @@ export default function Home() {
                         type="text"
                         placeholder="my-custom-slug"
                         value={slugInput}
-                        onChange={(e) => setSlugInput(e.target.value)}
-                        className="w-full pl-8 pr-4 py-3 bg-slate-950/70 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm font-mono"
+                        onChange={(e) => {
+                          setSlugInput(e.target.value);
+                          setSlugStatus(e.target.value.trim() ? "checking" : "idle");
+                        }}
+                        aria-describedby="slug-status"
+                        className={`w-full pl-8 pr-4 py-3 bg-slate-950/70 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm font-mono ${slugStatus === "available"
+                          ? "border-emerald-500/70"
+                          : slugStatus === "taken" || slugStatus === "invalid"
+                            ? "border-rose-500/70"
+                            : "border-slate-700/80"
+                          }`}
                       />
                     </div>
+                    <p id="slug-status" aria-live="polite" className="mt-1.5 min-h-[1rem] text-xs font-medium">
+                      {slugStatus === "checking" && <span className="text-slate-400">Checking availability…</span>}
+                      {slugStatus === "available" && <span className="text-emerald-400">✓ Slug available</span>}
+                      {slugStatus === "taken" && <span className="text-rose-400">✕ Slug already taken or reserved</span>}
+                      {slugStatus === "invalid" && (
+                        <span className="text-rose-400">✕ Use 3–50 letters, numbers, hyphens or underscores</span>
+                      )}
+                    </p>
                   </div>
 
                   <div>
