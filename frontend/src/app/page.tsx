@@ -120,6 +120,7 @@ export default function Home() {
   const [quotaModalOpen, setQuotaModalOpen] = useState(false);
   const [quotaModalTier, setQuotaModalTier] = useState<"guest" | "free">("guest");
   const [quotaModalMessage, setQuotaModalMessage] = useState("");
+  const guestLimit = quota?.tier === "guest" && quota.limit != null ? quota.limit : 3;
   const [upgradeLoading, setUpgradeLoading] = useState(false);
 
   // User Modals: My Links & Account
@@ -441,7 +442,7 @@ export default function Home() {
         setQuotaModalMessage(
           data.message ||
           (isGuest
-            ? "You've reached your daily limit of 3 free links. Create a free account or Continue with Google to shorten up to 10 links per day."
+            ? `You've reached your daily limit of ${data.limit ?? 3} free links. Create a free account or Continue with Google to shorten up to 10 links per day.`
             : "You've reached your free daily limit of 10 links. Upgrade to Pro for unlimited daily shortening, custom aliases, and advanced analytics.")
         );
         if (data.details) setQuota(data.details);
@@ -1455,7 +1456,7 @@ export default function Home() {
             </button>
 
             {quotaModalTier === "guest" ? (
-              /* Tier 1 UX: GUEST LIMIT REACHED (3 LINKS) */
+              /* Tier 1 UX: GUEST LIMIT REACHED */
               <div className="text-center">
                 <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-4">
                   <ShieldAlert className="w-7 h-7" />
@@ -1463,12 +1464,12 @@ export default function Home() {
                 <h3 className="text-xl font-bold text-white mb-2">Daily Guest Limit Reached</h3>
                 <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto mb-6">
                   {quotaModalMessage ||
-                    "You've reached your daily limit of 3 free links. Create a free account or Continue with Google to shorten up to 10 links per day."}
+                    `You've reached your daily limit of ${guestLimit} free links. Create a free account or Continue with Google to shorten up to 10 links per day.`}
                 </p>
 
                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-left mb-6 space-y-2 text-xs">
                   <div className="flex items-center gap-2 text-slate-400">
-                    <span className="text-rose-400 font-bold">✕</span> Guest Tier: 3 links/day (Exhausted)
+                    <span className="text-rose-400 font-bold">✕</span> Guest Tier: {guestLimit} links/day (Exhausted)
                   </div>
                   <div className="flex items-center gap-2 text-emerald-400 font-medium">
                     <span>✓</span> Free Account: <strong>10 links/day</strong> + Dashboard &amp; Analytics

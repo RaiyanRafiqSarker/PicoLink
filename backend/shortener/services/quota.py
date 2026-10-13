@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from django.utils import timezone as dj_timezone
 from django.db import transaction
@@ -7,11 +8,11 @@ from ..redis_client import redis_client
 
 logger = logging.getLogger(__name__)
 
-GUEST_DAILY_LIMIT = 3
+GUEST_DAILY_LIMIT = int(os.environ.get("GUEST_DAILY_LIMIT", "3"))
 FREE_DAILY_LIMIT = 10
 
 GUEST_LIMIT_MESSAGE = (
-    "You've reached your daily limit of 3 free links. "
+    f"You've reached your daily limit of {GUEST_DAILY_LIMIT} free links. "
     "Create a free account or Continue with Google to shorten up to 10 links per day."
 )
 
