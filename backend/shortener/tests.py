@@ -1,9 +1,12 @@
+from datetime import timedelta
 from django.test import TestCase, Client
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from shortener.models import URL, LinkClick
 from shortener.utils.base62 import encode_base62, decode_base62, SEQUENCE_OFFSET
 from shortener.utils.ssrf import validate_url_safety, is_slug_reserved
+from shortener.utils.analytics import parse_user_agent, referrer_source
 
 User = get_user_model()
 
@@ -147,3 +150,65 @@ class ShortenerAPITestCase(TestCase):
             HTTP_AUTHORIZATION=f"Bearer {access_token}",
         )
         self.assertEqual(admin_urls_resp.status_code, 200)
+
+
+class AnalyticsTestCase(TestCase):
+    IPHONE_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    WINDOWS_EDGE = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Edg/130.0"
+    WINDOWS_CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
+    ANDROID_TABLET = "Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
+
+    def test_referrer_source(self):
+        self.assertEqual(referrer_source(None), "Direct")
+        self.assertEqual(referrer_source(""), "Direct")
+        self.assertEqual(referrer_source("https://t.co/abc123"), "Twitter / X")
+        self.assertEqual(referrer_source("https://www.linkedin.com/feed/"), "LinkedIn")
+        self.assertEqual(referrer_source("https://www.google.co.uk/search?q=x"), "Google")
+        self.assertEqual(referrer_source("https://www.example.org/page"), "example.org")
+        # "notx.com" must not be mistaken for x.com
+        self.assertEqual(referrer_source("https://notx.com/"), "notx.com")
+
+    def test_parse_user_agent(self):
+        self.assertEqual(parse_user_agent(self.IPHONE_SAFARI), ("Mobile", "Safari"))
+        self.assertEqual(parse_user_agent(self.WINDOWS_EDGE), ("Desktop", "Edge"))
+        self.assertEqual(parse_user_agent(self.WINDOWS_CHROME), ("Desktop", "Chrome"))
+        self.assertEqual(parse_user_agent(self.ANDROID_TABLET), ("Tablet", "Chrome"))
+        self.assertEqual(parse_user_agent("Googlebot/2.1 (+http://www.google.com/bot.html)"), ("Bot", "Bot"))
+        self.assertEqual(parse_user_agent(None), ("Unknown", "Unknown"))
+
+    def test_stats_time_series_and_breakdowns(self):
+        URL.objects.create(original_url="https://python.org", short_code="charts")
+        clicks = [
+            (self.IPHONE_SAFARI, "https://t.co/a", 0),
+            (self.WINDOWS_EDGE, "https://t.co/b", 0),
+            (self.WINDOWS_CHROME, None, 3),
+            (self.WINDOWS_CHROME, "https://www.linkedin.com/", 20),
+            (self.WINDOWS_CHROME, None, 40),  # outside both windows
+        ]
+        for ua, ref, days_ago in clicks:
+            click = LinkClick.objects.create(short_code="charts", user_agent=ua, referrer=ref)
+            LinkClick.objects.filter(pk=click.pk).update(clicked_at=timezone.now() - timedelta(days=days_ago))
+
+        stats = self.client.get("/api/v1/stats/charts").json()
+
+        last_7, last_30 = stats["clicks_last_7_days"], stats["clicks_last_30_days"]
+        self.assertEqual(len(last_7), 7)
+        self.assertEqual(len(last_30), 30)
+        self.assertEqual(last_7[-1], {"date": timezone.now().date().isoformat(), "count": 2})
+        self.assertEqual(sum(d["count"] for d in last_7), 3)
+        self.assertEqual(sum(d["count"] for d in last_30), 4)
+
+        sources = {s["name"]: s for s in stats["referrer_sources"]}
+        self.assertEqual(sources["Twitter / X"]["count"], 2)
+        self.assertEqual(sources["Direct"]["percentage"], 40.0)
+        devices = {d["name"]: d["count"] for d in stats["device_breakdown"]}
+        self.assertEqual(devices, {"Desktop": 4, "Mobile": 1})
+        browsers = {b["name"]: b["count"] for b in stats["browser_breakdown"]}
+        self.assertEqual(browsers, {"Chrome": 3, "Safari": 1, "Edge": 1})
+
+    def test_stats_with_no_clicks(self):
+        URL.objects.create(original_url="https://python.org", short_code="quiet")
+        stats = self.client.get("/api/v1/stats/quiet").json()
+        self.assertEqual(sum(d["count"] for d in stats["clicks_last_30_days"]), 0)
+        self.assertEqual(stats["referrer_sources"], [])
+        self.assertEqual(stats["device_breakdown"], [])

@@ -3,6 +3,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Monitor,
+  Smartphone,
+  TrendingUp,
   Download,
   QrCode,
   Zap,
@@ -57,6 +69,44 @@ interface QuotaState {
   is_authenticated: boolean;
 }
 
+interface DailyClicks {
+  date: string;
+  count: number;
+}
+
+interface BreakdownItem {
+  name: string;
+  count: number;
+  percentage: number;
+}
+
+// "2026-10-13" -> "Oct 13" (parsed as UTC so the day never shifts)
+const formatChartDate = (isoDate: string) =>
+  new Date(`${isoDate}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+function BreakdownBars({ items, barClass, emptyText }: { items: BreakdownItem[]; barClass: string; emptyText: string }) {
+  if (items.length === 0) {
+    return <p className="text-xs text-slate-500 py-4 text-center">{emptyText}</p>;
+  }
+  return (
+    <ul className="space-y-3">
+      {items.map((item) => (
+        <li key={item.name} className="text-xs">
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <span className="text-slate-300 truncate">{item.name}</span>
+            <span className="text-slate-400 shrink-0 tabular-nums">
+              <span className="font-bold text-white">{item.percentage}%</span> · {item.count}
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div className={`h-full rounded-full ${barClass}`} style={{ width: `${item.percentage}%` }} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface StatsData {
   short_code: string;
   original_url: string;
@@ -67,6 +117,11 @@ interface StatsData {
   top_referrers: Array<{ referrer: string; count: number }>;
   country_breakdown: Array<{ country_code: string; count: number }>;
   clicks_over_time: Array<{ date: string; count: number }>;
+  clicks_last_7_days?: DailyClicks[];
+  clicks_last_30_days?: DailyClicks[];
+  referrer_sources?: BreakdownItem[];
+  device_breakdown?: BreakdownItem[];
+  browser_breakdown?: BreakdownItem[];
   recent_clicks: Array<{
     clicked_at: string;
     referrer: string | null;
@@ -148,6 +203,7 @@ export default function Home() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState("");
   const [statsData, setStatsData] = useState<StatsData | null>(null);
+  const [chartRange, setChartRange] = useState<7 | 30>(7);
 
   // Superuser Admin state
   const [adminToken, setAdminToken] = useState<string | null>(null);
@@ -1136,6 +1192,77 @@ export default function Home() {
                   </a>
                 </div>
 
+                {/* Clicks Over Time */}
+                <div className="p-5 bg-slate-900/60 border border-slate-800 rounded-xl">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-indigo-400" />
+                      Clicks Over Time
+                    </h3>
+                    <div className="flex p-0.5 bg-slate-950 border border-slate-800 rounded-lg" role="group" aria-label="Chart range">
+                      {([7, 30] as const).map((days) => (
+                        <button
+                          key={days}
+                          onClick={() => setChartRange(days)}
+                          aria-pressed={chartRange === days}
+                          className={`px-3 py-1 text-xs font-semibold rounded-md transition ${chartRange === days ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"}`}
+                        >
+                          {days} days
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {(() => {
+                    const series = (chartRange === 7 ? statsData.clicks_last_7_days : statsData.clicks_last_30_days) ?? [];
+                    const rangeTotal = series.reduce((sum, d) => sum + d.count, 0);
+                    return (
+                      <>
+                        <p className="text-xs text-slate-400 mb-3">
+                          <span className="font-bold text-white">{rangeTotal}</span> clicks in the last {chartRange} days
+                        </p>
+                        <div className="h-60 -ml-3">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={series} margin={{ top: 5, right: 12, bottom: 0, left: 0 }}>
+                              <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={formatChartDate}
+                                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                                axisLine={{ stroke: "#334155" }}
+                                tickLine={false}
+                                interval="preserveStartEnd"
+                                minTickGap={24}
+                              />
+                              <YAxis
+                                allowDecimals={false}
+                                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={36}
+                              />
+                              <Tooltip
+                                labelFormatter={(label) => formatChartDate(String(label))}
+                                formatter={(value) => [value, "Clicks"]}
+                                contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }}
+                                labelStyle={{ color: "#e2e8f0" }}
+                                itemStyle={{ color: "#a5b4fc" }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="count"
+                                stroke="#818cf8"
+                                strokeWidth={2}
+                                dot={chartRange === 7 ? { r: 3, fill: "#818cf8" } : false}
+                                activeDot={{ r: 5 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
                 {/* Breakdown Grids */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Referrers */}
@@ -1144,18 +1271,11 @@ export default function Home() {
                       <Globe className="w-4 h-4 text-indigo-400" />
                       Top Referrers
                     </h3>
-                    {statsData.top_referrers.length === 0 ? (
-                      <p className="text-xs text-slate-500 py-4 text-center">No referrers logged yet.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {statsData.top_referrers.map((r, i) => (
-                          <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-800/60">
-                            <span className="text-slate-300 font-mono truncate max-w-[220px]">{r.referrer}</span>
-                            <span className="font-bold text-indigo-400">{r.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <BreakdownBars
+                      items={statsData.referrer_sources ?? []}
+                      barClass="bg-indigo-500"
+                      emptyText="No referrers logged yet."
+                    />
                   </div>
 
                   {/* Countries */}
@@ -1176,6 +1296,32 @@ export default function Home() {
                         ))}
                       </div>
                     )}
+                  </div>
+
+                  {/* Devices */}
+                  <div className="p-5 bg-slate-900/60 border border-slate-800 rounded-xl">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+                      <Smartphone className="w-4 h-4 text-emerald-400" />
+                      Devices
+                    </h3>
+                    <BreakdownBars
+                      items={statsData.device_breakdown ?? []}
+                      barClass="bg-emerald-500"
+                      emptyText="No device data yet."
+                    />
+                  </div>
+
+                  {/* Browsers */}
+                  <div className="p-5 bg-slate-900/60 border border-slate-800 rounded-xl">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+                      <Monitor className="w-4 h-4 text-amber-400" />
+                      Browsers
+                    </h3>
+                    <BreakdownBars
+                      items={statsData.browser_breakdown ?? []}
+                      barClass="bg-amber-500"
+                      emptyText="No browser data yet."
+                    />
                   </div>
                 </div>
 

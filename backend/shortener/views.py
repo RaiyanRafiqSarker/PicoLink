@@ -22,6 +22,7 @@ from .serializers import (
     get_slug_unavailable_reason,
 )
 from .utils.base62 import encode_base62, SEQUENCE_OFFSET
+from .utils.analytics import daily_click_series, referrer_and_device_breakdowns
 from .redis_client import redis_client
 from .services.quota import QuotaService
 
@@ -314,6 +315,9 @@ class StatsView(APIView):
             "top_referrers": top_referrers,
             "country_breakdown": country_breakdown,
             "clicks_over_time": clicks_over_time,
+            "clicks_last_7_days": daily_click_series(clicks_qs, 7),
+            "clicks_last_30_days": daily_click_series(clicks_qs, 30),
+            **referrer_and_device_breakdowns(clicks_qs),
             "recent_clicks": recent_clicks,
         })
 
