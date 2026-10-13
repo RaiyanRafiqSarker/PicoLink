@@ -19,6 +19,7 @@ from .serializers import (
     UserRegisterSerializer,
     UserLoginSerializer,
     GoogleAuthSerializer,
+    UpdateLinkDestinationSerializer,
     get_slug_unavailable_reason,
 )
 from .utils.base62 import encode_base62, SEQUENCE_OFFSET
@@ -512,27 +513,65 @@ class GoogleAuthView(APIView):
         )
 
 
+def serialize_user_link(request, u: URL) -> dict:
+    raw_url = request.build_absolute_uri(f"/{u.short_code}")
+    return {
+        "id": u.id,
+        "short_code": u.short_code,
+        "short_url": raw_url,
+        "formatted_short_url": raw_url,
+        "original_url": u.original_url,
+        "is_active": u.is_active,
+        "is_expired": u.is_expired,
+        "created_at": u.created_at.isoformat(),
+        "expires_at": u.expires_at.isoformat() if u.expires_at else None,
+        "total_clicks": LinkClick.objects.filter(short_code=u.short_code).count(),
+    }
+
+
 class UserLinksListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         links_qs = URL.objects.filter(created_by=request.user).order_by("-created_at")
-        results = []
-        for u in links_qs[:100]:
-            click_count = LinkClick.objects.filter(short_code=u.short_code).count()
-            raw_url = request.build_absolute_uri(f"/{u.short_code}")
-            results.append({
-                "id": u.id,
-                "short_code": u.short_code,
-                "short_url": raw_url,
-                "formatted_short_url": raw_url,
-                "original_url": u.original_url,
-                "is_active": u.is_active,
-                "created_at": u.created_at.isoformat(),
-                "expires_at": u.expires_at.isoformat() if u.expires_at else None,
-                "total_clicks": click_count,
-            })
+        results = [serialize_user_link(request, u) for u in links_qs[:100]]
         return Response({"count": len(results), "results": results})
+
+
+class UserLinkDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk: int):
+        # Scoped to the requesting user, so other people's links look like they don't exist
+        url_obj = URL.objects.filter(pk=pk, created_by=request.user).first()
+        if not url_obj:
+            return Response({"error": "Not Found", "message": "Link not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not url_obj.is_active or url_obj.is_expired:
+            return Response(
+                {"error": "Bad Request", "message": "Only active, unexpired links can have their destination edited."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = UpdateLinkDestinationSerializer(data=request.data)
+        if not serializer.is_valid():
+            err = serializer.errors["original_url"][0]
+            return Response(
+                {"error": "Bad Request", "message": str(err), "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        url_obj.original_url = serializer.validated_data["original_url"]
+        url_obj.save(update_fields=["original_url"])
+
+        # Drop the cached redirect so the new destination takes effect immediately
+        if redis_client:
+            try:
+                redis_client.delete(f"url:{url_obj.short_code}")
+            except Exception:
+                pass
+
+        return Response(serialize_user_link(request, url_obj))
 
 
 class UserUpgradeView(APIView):

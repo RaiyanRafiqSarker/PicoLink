@@ -1,6 +1,7 @@
 from datetime import timedelta
 from django.test import TestCase, Client
 from django.utils import timezone
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from shortener.models import URL, LinkClick
@@ -212,3 +213,51 @@ class AnalyticsTestCase(TestCase):
         self.assertEqual(sum(d["count"] for d in stats["clicks_last_30_days"]), 0)
         self.assertEqual(stats["referrer_sources"], [])
         self.assertEqual(stats["device_breakdown"], [])
+
+
+class UserLinkEditTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="owner", password="ownerpass123")
+        self.other = User.objects.create_user(username="other", password="otherpass123")
+        self.link = URL.objects.create(original_url="https://old.example.com", short_code="editme", created_by=self.owner)
+
+    def auth(self, user):
+        return {"HTTP_AUTHORIZATION": f"Bearer {RefreshToken.for_user(user).access_token}"}
+
+    def patch(self, pk, url, user=None):
+        headers = self.auth(user) if user else {}
+        return self.client.patch(
+            f"/api/v1/user/links/{pk}/", data={"original_url": url}, content_type="application/json", **headers
+        )
+
+    def test_owner_can_edit_destination_and_redirect_follows(self):
+        resp = self.patch(self.link.pk, "https://example.com/new", self.owner)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["original_url"], "https://example.com/new")
+        self.assertEqual(resp.json()["short_code"], "editme")
+        self.assertEqual(self.client.get("/editme")["Location"], "https://example.com/new")
+
+    def test_requires_authentication(self):
+        self.assertEqual(self.patch(self.link.pk, "https://example.com/new").status_code, 401)
+
+    def test_cannot_edit_someone_elses_link(self):
+        resp = self.patch(self.link.pk, "https://example.com/evil", self.other)
+        self.assertEqual(resp.status_code, 404)
+        self.link.refresh_from_db()
+        self.assertEqual(self.link.original_url, "https://old.example.com")
+
+    def test_rejects_unsafe_destination(self):
+        resp = self.patch(self.link.pk, "http://127.0.0.1/admin", self.owner)
+        self.assertEqual(resp.status_code, 400)
+
+    def test_rejects_expired_and_inactive_links(self):
+        URL.objects.filter(pk=self.link.pk).update(expires_at=timezone.now() - timedelta(days=1))
+        self.assertEqual(self.patch(self.link.pk, "https://example.com/new", self.owner).status_code, 400)
+
+        URL.objects.filter(pk=self.link.pk).update(expires_at=None, is_active=False)
+        self.assertEqual(self.patch(self.link.pk, "https://example.com/new", self.owner).status_code, 400)
+
+    def test_links_list_reports_expiry(self):
+        URL.objects.filter(pk=self.link.pk).update(expires_at=timezone.now() - timedelta(days=1))
+        results = self.client.get("/api/v1/user/links", **self.auth(self.owner)).json()["results"]
+        self.assertEqual(results[0]["is_expired"], True)

@@ -43,6 +43,16 @@ class ShortenRequestSerializer(serializers.Serializer):
         return val
 
 
+class UpdateLinkDestinationSerializer(serializers.Serializer):
+    original_url = serializers.CharField(max_length=2048)
+
+    def validate_original_url(self, value):
+        is_safe, err_msg = validate_url_safety(value)
+        if not is_safe:
+            raise serializers.ValidationError(err_msg)
+        return value.strip()
+
+
 class URLResponseSerializer(serializers.ModelSerializer):
     short_url = serializers.SerializerMethodField()
     formatted_short_url = serializers.SerializerMethodField()

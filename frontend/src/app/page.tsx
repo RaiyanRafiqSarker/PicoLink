@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
 import {
   CartesianGrid,
   Line,
@@ -12,6 +13,8 @@ import {
   YAxis,
 } from "recharts";
 import {
+  Pencil,
+  Save,
   Monitor,
   Smartphone,
   TrendingUp,
@@ -147,10 +150,25 @@ interface UserLinkItem {
   formatted_short_url?: string;
   original_url: string;
   is_active: boolean;
+  is_expired?: boolean;
   created_at: string;
   expires_at: string | null;
   total_clicks: number;
 }
+
+type LinkStatus = "active" | "expired" | "inactive";
+
+const getLinkStatus = (link: UserLinkItem): LinkStatus => {
+  const expired = link.is_expired ?? (link.expires_at !== null && new Date(link.expires_at) < new Date());
+  if (expired) return "expired";
+  return link.is_active ? "active" : "inactive";
+};
+
+const LINK_STATUS_STYLES: Record<LinkStatus, string> = {
+  active: "bg-emerald-500/15 text-emerald-300",
+  expired: "bg-amber-500/15 text-amber-300",
+  inactive: "bg-slate-700/60 text-slate-300",
+};
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -184,6 +202,19 @@ export default function Home() {
   const [myLinksModalOpen, setMyLinksModalOpen] = useState(false);
   const [userLinks, setUserLinks] = useState<UserLinkItem[]>([]);
   const [userLinksLoading, setUserLinksLoading] = useState(false);
+  const [linksSearch, setLinksSearch] = useState("");
+  const [linksStatusFilter, setLinksStatusFilter] = useState<"all" | "active" | "expired">("all");
+  const [editingLinkId, setEditingLinkId] = useState<number | null>(null);
+  const [editUrlInput, setEditUrlInput] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const linksQuery = linksSearch.trim().toLowerCase();
+  const visibleUserLinks = userLinks.filter(
+    (link) =>
+      (linksStatusFilter === "all" || getLinkStatus(link) === linksStatusFilter) &&
+      (!linksQuery ||
+        link.short_code.toLowerCase().includes(linksQuery) ||
+        link.original_url.toLowerCase().includes(linksQuery))
+  );
   const [accountModalOpen, setAccountModalOpen] = useState(false);
 
   // Shorten Form state
@@ -467,7 +498,7 @@ export default function Home() {
         setCurrentUser(data.user);
         setQuota(data.quota);
         setQuotaModalOpen(false);
-        alert("🎉 Congratulations! You have been upgraded to PicoLink Pro with Unlimited Links!");
+        toast.success("You're now on PicoLink Pro", { description: "Enjoy unlimited daily links." });
       }
     } catch (err) {
       console.error("Upgrade error:", err);
@@ -540,6 +571,7 @@ export default function Home() {
       }
 
       setShortenResult(data);
+      toast.success("Short link created", { description: data.short_url });
       if (data.quota) setQuota(data.quota);
       else fetchQuota(authToken);
 
@@ -554,10 +586,49 @@ export default function Home() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast.success("Link copied to clipboard", { description: text });
+    } catch {
+      toast.error("Couldn't copy the link", { description: "Your browser blocked clipboard access." });
+    }
+  };
+
+  const startEditingLink = (link: UserLinkItem) => {
+    setEditingLinkId(link.id);
+    setEditUrlInput(link.original_url);
+  };
+
+  const handleUpdateDestination = async (link: UserLinkItem) => {
+    const newUrl = editUrlInput.trim();
+    if (!authToken || !newUrl) return;
+    if (newUrl === link.original_url) {
+      setEditingLinkId(null);
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/user/links/${link.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ original_url: newUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error("Couldn't update destination", { description: data.message || "Please try again." });
+        return;
+      }
+      setUserLinks((links) => links.map((l) => (l.id === link.id ? { ...l, ...data } : l)));
+      setEditingLinkId(null);
+      toast.success(`/${link.short_code} now points to the new destination`, { description: data.original_url });
+    } catch {
+      toast.error("Couldn't update destination", { description: "Network error. Is the backend running?" });
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const triggerDownload = (href: string, filename: string) => {
@@ -687,9 +758,8 @@ export default function Home() {
     }
   };
 
-  const handleDeleteUrl = async (id: number) => {
+  const deleteUrl = async (id: number) => {
     if (!adminToken) return;
-    if (!confirm("Are you sure you want to delete this shortened URL?")) return;
     try {
       const res = await fetch(`${API_BASE}/api/v1/admin/urls/${id}`, {
         method: "DELETE",
@@ -697,10 +767,24 @@ export default function Home() {
       });
       if (res.ok) {
         fetchAdminUrls(adminToken, adminSearch);
+        toast.success("Short link deleted");
+      } else {
+        toast.error("Couldn't delete the link");
       }
     } catch (err) {
       console.error(err);
+      toast.error("Couldn't delete the link", { description: "Network error. Is the backend running?" });
     }
+  };
+
+  const handleDeleteUrl = (id: number) => {
+    if (!adminToken) return;
+    toast.warning("Delete this shortened URL?", {
+      description: "This can't be undone.",
+      duration: 10000,
+      action: { label: "Delete", onClick: () => deleteUrl(id) },
+      cancel: { label: "Cancel", onClick: () => {} },
+    });
   };
 
   return (
@@ -1862,8 +1946,32 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">My Shortened Links</h3>
-                <p className="text-xs text-slate-400">View and inspect links created from your account</p>
+                <p className="text-xs text-slate-400">Search, filter and edit links created from your account</p>
               </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                <input
+                  type="search"
+                  value={linksSearch}
+                  onChange={(e) => setLinksSearch(e.target.value)}
+                  placeholder="Search by short code or destination…"
+                  aria-label="Search links"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-950/70 border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <select
+                value={linksStatusFilter}
+                onChange={(e) => setLinksStatusFilter(e.target.value as "all" | "active" | "expired")}
+                aria-label="Filter by status"
+                className="sm:w-36 px-3 py-2 bg-slate-950/70 border border-slate-700/80 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
+              </select>
             </div>
 
             <div className="flex-1 overflow-y-auto">
@@ -1876,25 +1984,83 @@ export default function Home() {
                 <div className="py-12 text-center text-slate-500 text-xs">
                   No links created under this account yet. Shorten your first link above!
                 </div>
+              ) : visibleUserLinks.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-xs">
+                  No links match your search or filter.
+                </div>
               ) : (
                 <div className="divide-y divide-slate-800/80">
-                  {userLinks.map((item) => (
-                    <div key={item.id} className="py-3 flex items-center justify-between gap-4">
-                      <div className="truncate max-w-[400px]">
-                        <div className="flex items-center gap-2">
+                  {visibleUserLinks.map((item) => {
+                    const linkStatus = getLinkStatus(item);
+                    const isEditing = editingLinkId === item.id;
+                    return (
+                    <div key={item.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono font-bold text-indigo-300 text-xs">
                             /{item.short_code}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${LINK_STATUS_STYLES[linkStatus]}`}>
+                            {linkStatus}
                           </span>
                           <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-semibold">
                             {item.total_clicks} clicks
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5 font-mono">
-                          {item.original_url}
-                        </p>
+                        {isEditing ? (
+                          <form
+                            className="mt-2 flex flex-col sm:flex-row gap-2"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              handleUpdateDestination(item);
+                            }}
+                          >
+                            <input
+                              type="url"
+                              required
+                              autoFocus
+                              value={editUrlInput}
+                              onChange={(e) => setEditUrlInput(e.target.value)}
+                              onKeyDown={(e) => e.key === "Escape" && setEditingLinkId(null)}
+                              aria-label={`New destination URL for /${item.short_code}`}
+                              className="flex-1 min-w-0 px-3 py-1.5 bg-slate-950/70 border border-indigo-500/60 rounded-lg text-[11px] font-mono text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="submit"
+                                disabled={editSaving}
+                                className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white text-xs font-semibold flex items-center gap-1 transition"
+                              >
+                                {editSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingLinkId(null)}
+                                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5 font-mono">
+                            {item.original_url}
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        {linkStatus === "active" && !isEditing && (
+                          <button
+                            onClick={() => startEditingLink(item)}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs flex items-center gap-1 transition"
+                            title="Edit destination URL"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Edit
+                          </button>
+                        )}
                         <button
                           onClick={() =>
                             copyToClipboard(item.short_url)
@@ -1916,7 +2082,8 @@ export default function Home() {
                         </a>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

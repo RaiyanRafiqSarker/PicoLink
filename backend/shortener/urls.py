@@ -11,6 +11,7 @@ from .views import (
     UserLoginView,
     GoogleAuthView,
     UserLinksListView,
+    UserLinkDetailView,
     UserUpgradeView,
     AdminURLListView,
     AdminURLToggleView,
@@ -34,6 +35,7 @@ urlpatterns = [
     # Quota & User Link Management
     path("v1/user/quota", UserQuotaView.as_view(), name="user-quota"),
     path("v1/user/links", UserLinksListView.as_view(), name="user-links"),
+    path("v1/user/links/<int:pk>/", UserLinkDetailView.as_view(), name="user-link-detail"),
     path("v1/user/upgrade", UserUpgradeView.as_view(), name="user-upgrade"),
 
     # Superuser Admin Routes
