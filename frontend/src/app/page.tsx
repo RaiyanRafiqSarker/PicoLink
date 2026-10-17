@@ -49,8 +49,25 @@ import {
   ShieldAlert,
   Link as LinkIcon,
   CheckCircle,
-  HelpCircle
+  HelpCircle,
+  Sun,
+  Moon,
+  Grid
 } from "lucide-react";
+
+import Sidebar, { AuthNavTab } from "../components/dashboard/Sidebar";
+import TopHeader from "../components/dashboard/TopHeader";
+import CreateNewModal from "../components/dashboard/CreateNewModal";
+import AssistDrawer from "../components/dashboard/AssistDrawer";
+import HomeTab from "../components/dashboard/tabs/HomeTab";
+import LinksTab from "../components/dashboard/tabs/LinksTab";
+import QrTab from "../components/dashboard/tabs/QrTab";
+import PagesTab from "../components/dashboard/tabs/PagesTab";
+import CampaignsTab from "../components/dashboard/tabs/CampaignsTab";
+import CustomDomainsTab from "../components/dashboard/tabs/CustomDomainsTab";
+import SettingsTab from "../components/dashboard/tabs/SettingsTab";
+import AnalyticsTab from "../components/dashboard/tabs/AnalyticsTab";
+import Footer from "../components/dashboard/Footer";
 
 interface ShortenResult {
   short_code: string;
@@ -237,6 +254,48 @@ export default function Home() {
   const [statsData, setStatsData] = useState<StatsData | null>(null);
   const [chartRange, setChartRange] = useState<7 | 30>(7);
 
+  // Light / Dark Theme Mode State
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  // Authenticated Bitly-style Workspace Navigation State
+  const [authNavTab, setAuthNavTab] = useState<AuthNavTab>("home");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [createNewModalOpen, setCreateNewModalOpen] = useState(false);
+  const [assistDrawerOpen, setAssistDrawerOpen] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
+
+  useEffect(() => {
+    try {
+      const savedTheme = (localStorage.getItem("picolink_theme") as "dark" | "light") || "dark";
+      setTheme(savedTheme);
+      applyTheme(savedTheme);
+    } catch {
+      // ignore storage access issues
+    }
+  }, []);
+
+  const applyTheme = (nextTheme: "dark" | "light") => {
+    if (nextTheme === "light") {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+      document.documentElement.setAttribute("data-theme", "light");
+    } else {
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  };
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try {
+      localStorage.setItem("picolink_theme", next);
+    } catch {}
+    applyTheme(next);
+    toast.success(`Switched to ${next === "dark" ? "Dark" : "Light"} mode`);
+  };
+
   // Superuser Admin state
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [adminUser, setAdminUser] = useState<any>(null);
@@ -326,6 +385,7 @@ export default function Home() {
         } else {
           fetchQuota(token);
         }
+        fetchUserLinks(token);
       } else {
         // Token expired
         handleLogout();
@@ -366,6 +426,7 @@ export default function Home() {
       setCurrentUser(data.user);
       if (data.quota) setQuota(data.quota);
       else fetchQuota(token);
+      fetchUserLinks(token);
 
       setAuthModalOpen(false);
       setAuthPassword("");
@@ -408,6 +469,7 @@ export default function Home() {
       setCurrentUser(data.user);
       if (data.quota) setQuota(data.quota);
       else fetchQuota(token);
+      fetchUserLinks(token);
 
       setAuthModalOpen(false);
       setAuthPassword("");
@@ -455,6 +517,7 @@ export default function Home() {
       setCurrentUser(data.user);
       if (data.quota) setQuota(data.quota);
       else fetchQuota(token);
+      fetchUserLinks(token);
 
       setAuthModalOpen(false);
       setQuotaModalOpen(false);
@@ -509,12 +572,16 @@ export default function Home() {
   };
 
   // Fetch Links created by User
-  const fetchUserLinks = async () => {
-    if (!authToken) return;
+  const fetchUserLinks = async (token?: string | null) => {
+    const activeTok =
+      token ||
+      authToken ||
+      (typeof window !== "undefined" ? localStorage.getItem("picolink_token") : null);
+    if (!activeTok) return;
     setUserLinksLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/v1/user/links`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${activeTok}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -575,6 +642,24 @@ export default function Home() {
       toast.success("Short link created", { description: data.short_url });
       if (data.quota) setQuota(data.quota);
       else fetchQuota(authToken);
+
+      // Optimistically insert newly created link into userLinks
+      const newLinkItem: UserLinkItem = {
+        id: Date.now(),
+        short_code: data.short_code,
+        short_url: data.short_url,
+        formatted_short_url: data.formatted_short_url || data.short_url,
+        original_url: data.original_url || payload.original_url,
+        is_active: true,
+        is_expired: false,
+        created_at: data.created_at || new Date().toISOString(),
+        expires_at: data.expires_at || null,
+        total_clicks: 0,
+      };
+      setUserLinks((prev) => [newLinkItem, ...prev.filter((l) => l.short_code !== data.short_code)]);
+
+      // Sync latest links from database
+      fetchUserLinks(authToken);
 
       setUrlInput("");
       setSlugInput("");
@@ -788,10 +873,233 @@ export default function Home() {
     });
   };
 
+  // =========================================================
+  // AUTHENTICATED WORKSPACE VIEW (BITLY ARCHITECTURE)
+  // =========================================================
+  if (currentUser) {
+    return (
+      <div className="h-screen w-screen overflow-hidden flex bg-[#080d1a] text-slate-100 selection:bg-indigo-500 selection:text-white theme-root">
+        {/* Ambient background decorative glow */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 ambient-glow">
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px]"></div>
+          <div className="absolute top-1/2 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[140px]"></div>
+        </div>
+
+        {/* 1. Left Collapsible Navigation Sidebar */}
+        <Sidebar
+          activeTab={authNavTab}
+          onTabChange={(tab) => {
+            setAuthNavTab(tab);
+            if (tab === "links") fetchUserLinks();
+          }}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onCreateNewClick={() => setCreateNewModalOpen(true)}
+        />
+
+        {/* 2. Main Workspace Viewport */}
+        <div className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
+          {/* Top Bar matching screenshot */}
+          <TopHeader
+            searchQuery={globalSearch}
+            onSearchChange={setGlobalSearch}
+            quota={quota}
+            currentUser={currentUser}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            userDropdownOpen={userDropdownOpen}
+            onToggleUserDropdown={() => setUserDropdownOpen(!userDropdownOpen)}
+            onLogout={handleLogout}
+            onOpenAccountModal={() => setAccountModalOpen(true)}
+            onOpenLinksTab={() => {
+              setAuthNavTab("links");
+              fetchUserLinks();
+            }}
+            onUpgradePro={handleUpgradeToPro}
+            assistDrawerOpen={assistDrawerOpen}
+            onToggleAssistDrawer={() => setAssistDrawerOpen(!assistDrawerOpen)}
+          />
+
+          {/* Scrollable Main Body */}
+          <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 w-full">
+            {authNavTab === "home" && (
+              <HomeTab
+                urlInput={urlInput}
+                setUrlInput={setUrlInput}
+                slugInput={slugInput}
+                setSlugInput={setSlugInput}
+                slugStatus={slugStatus}
+                expiresInput={expiresInput}
+                setExpiresInput={setExpiresInput}
+                shortenLoading={shortenLoading}
+                handleShorten={handleShorten}
+                shortenResult={shortenResult}
+                copied={copied}
+                setCopied={setCopied}
+                quota={quota}
+                onUpgradePro={handleUpgradeToPro}
+                onNavigateToLinks={() => {
+                  setAuthNavTab("links");
+                  fetchUserLinks();
+                }}
+                onNavigateToQr={() => setAuthNavTab("qrcodes")}
+                userLinksCount={userLinks.length}
+              />
+            )}
+
+            {authNavTab === "links" && (
+              <LinksTab
+                userLinks={userLinks}
+                userLinksLoading={userLinksLoading}
+                onRefreshLinks={fetchUserLinks}
+                onCreateLinkClick={() => setCreateNewModalOpen(true)}
+                onInspectAnalytics={(code) => {
+                  setLookupCode(code);
+                  setAuthNavTab("analytics");
+                  handleFetchStats(code);
+                }}
+                onUpgradePro={handleUpgradeToPro}
+                authToken={authToken}
+                apiBase={API_BASE}
+              />
+            )}
+
+            {authNavTab === "qrcodes" && (
+              <QrTab onCreateClick={() => setCreateNewModalOpen(true)} userLinks={userLinks} />
+            )}
+
+            {authNavTab === "pages" && (
+              <PagesTab userLinks={userLinks} currentUser={currentUser} />
+            )}
+
+            {authNavTab === "analytics" && (
+              <AnalyticsTab
+                lookupCode={lookupCode}
+                setLookupCode={setLookupCode}
+                statsLoading={statsLoading}
+                statsError={statsError}
+                statsData={statsData}
+                chartRange={chartRange}
+                setChartRange={setChartRange}
+                onFetchStats={handleFetchStats}
+                onOpenAssist={() => setAssistDrawerOpen(true)}
+                onUpgradePro={handleUpgradeToPro}
+                formatChartDate={formatChartDate}
+                BreakdownBars={BreakdownBars}
+                apiBase={API_BASE}
+              />
+            )}
+
+            {authNavTab === "campaigns" && (
+              <CampaignsTab onUpgradePro={handleUpgradeToPro} />
+            )}
+
+            {authNavTab === "custom_domains" && <CustomDomainsTab />}
+
+            {authNavTab === "integrations" && (
+              <div className="max-w-4xl mx-auto p-12 rounded-3xl bg-slate-900 border border-slate-800 text-center space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                  <Grid className="w-8 h-8" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Integrations &amp; Ecosystem</h2>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Seamlessly connect PicoLink to Chrome, Canva, Slack, Zapier, and Shopify.
+                </p>
+              </div>
+            )}
+
+            {authNavTab === "settings" && (
+              <SettingsTab currentUser={currentUser} onLogout={handleLogout} />
+            )}
+          </main>
+          <Footer />
+        </div>
+
+        {/* Sliding AI Assist Drawer */}
+        <AssistDrawer
+          isOpen={assistDrawerOpen}
+          onClose={() => setAssistDrawerOpen(false)}
+          currentUser={currentUser}
+          onUpgradePro={handleUpgradeToPro}
+          onShortenUrl={(url) => {
+            setUrlInput(url);
+            setAuthNavTab("home");
+          }}
+        />
+
+        {/* 3-Tile Create New Modal (with L & Q hotkeys) */}
+        <CreateNewModal
+          isOpen={createNewModalOpen}
+          onClose={() => setCreateNewModalOpen(false)}
+          onSelectOption={(tab) => {
+            setAuthNavTab(tab);
+            if (tab === "links") fetchUserLinks();
+          }}
+          authToken={authToken}
+          apiBase={API_BASE}
+          onLinkCreated={fetchUserLinks}
+        />
+
+        {/* Account & Plan Modal */}
+        {accountModalOpen && currentUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+            <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden">
+              <button
+                onClick={() => setAccountModalOpen(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="text-center mb-6">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white mx-auto mb-3 shadow-lg shadow-indigo-500/25">
+                  {currentUser.username ? currentUser.username.substring(0, 1).toUpperCase() : "U"}
+                </div>
+                <h3 className="text-lg font-bold text-white">{currentUser.username}</h3>
+                <p className="text-xs text-slate-400">{currentUser.email}</p>
+              </div>
+
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 mb-6 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Subscription Tier</span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                      currentUser.is_pro || currentUser.subscription_tier === "pro"
+                        ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                        : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                    }`}
+                  >
+                    {currentUser.is_pro || currentUser.subscription_tier === "pro"
+                      ? "Pro (Unlimited)"
+                      : "Free (10/day)"}
+                  </span>
+                </div>
+              </div>
+
+              {!currentUser.is_pro && currentUser.subscription_tier !== "pro" && (
+                <button
+                  onClick={handleUpgradeToPro}
+                  disabled={upgradeLoading}
+                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Crown className="w-4 h-4 text-amber-300" />
+                  <span>Upgrade to Pro Plan</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // =========================================================
+  // PUBLIC / VISITOR VIEW (UNAUTHENTICATED HOMEPAGE)
+  // =========================================================
   return (
-    <div className="min-h-screen bg-[#080d1a] text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#080d1a] text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white theme-root">
       {/* Ambient background decorative glow */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 ambient-glow">
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px]"></div>
         <div className="absolute top-1/2 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[140px]"></div>
         <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px]"></div>
@@ -808,10 +1116,10 @@ export default function Home() {
               <Zap className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent block leading-tight">
+              <span className="brand-title text-xl font-extrabold tracking-tight block leading-tight">
                 PicoLink
               </span>
-              <p className="text-xs text-slate-400 mt-0.5">Make Long Links Simple & Trackable</p>
+              <p className="header-tagline text-xs mt-0.5">Make Long Links Simple & Trackable</p>
             </div>
           </div>
 
@@ -820,11 +1128,11 @@ export default function Home() {
             {/* Subtle Daily Link Counter Badge */}
             {quota && (
               <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border transition shadow-sm ${quota.tier === "pro"
-                    ? "bg-purple-950/40 border-purple-500/30 text-purple-300 font-semibold"
+                className={`header-quota-badge flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border transition shadow-sm ${quota.tier === "pro"
+                    ? "pro-tier bg-purple-950/40 border-purple-500/30 text-purple-300 font-semibold"
                     : quota.tier === "free"
-                      ? "bg-indigo-950/40 border-indigo-500/30 text-indigo-300"
-                      : "bg-slate-950/70 border-slate-700/80 text-slate-300"
+                      ? "free-tier bg-indigo-950/40 border-indigo-500/30 text-indigo-300"
+                      : "guest-tier bg-slate-950/70 border-slate-700/80 text-slate-300"
                   }`}
                 title={`Resets daily at 00:00 UTC. Used: ${quota.used} links.`}
               >
@@ -855,7 +1163,7 @@ export default function Home() {
               <div className="relative">
                 <button
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-white transition shadow-sm"
+                  className="header-user-btn flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-white transition shadow-sm"
                 >
                   <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-[11px] font-bold text-white shadow-inner">
                     {currentUser.username ? currentUser.username.substring(0, 1).toUpperCase() : "U"}
@@ -866,7 +1174,7 @@ export default function Home() {
 
                 {/* Dropdown Menu */}
                 {userDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50 animate-fade-in backdrop-blur-2xl">
+                  <div className="header-user-dropdown absolute right-0 mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50 animate-fade-in backdrop-blur-2xl">
                     <div className="px-3 py-2 border-b border-slate-800/80 mb-1">
                       <p className="text-[11px] text-slate-400 truncate">{currentUser.email}</p>
                       <div className="flex items-center gap-1.5 mt-1">
@@ -929,6 +1237,26 @@ export default function Home() {
                 <span>Login / Sign Up</span>
               </button>
             )}
+
+            {/* Light / Dark Mode Switcher Button */}
+            <button
+              onClick={toggleTheme}
+              className="header-theme-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700/90 text-xs font-semibold text-slate-200 hover:text-white transition shadow-sm hover:scale-105 active:scale-95"
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label="Toggle light or dark theme"
+            >
+              {theme === "dark" ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden sm:inline">Dark</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -939,12 +1267,12 @@ export default function Home() {
       <main className="relative z-10 max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 w-full flex-1">
         {/* Navigation Switcher Tabs */}
         <div className="flex items-center justify-center mb-8">
-          <div className="inline-flex p-1 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl shadow-lg">
+          <div className="nav-tabs-container inline-flex p-1 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl shadow-lg">
             <button
               onClick={() => setActiveTab("shorten")}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === "shorten"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                  : "text-slate-400 hover:text-slate-200"
+                  : "nav-tab-inactive text-slate-400 hover:text-slate-200"
                 }`}
             >
               <Sparkles className="w-4 h-4" />
@@ -954,7 +1282,7 @@ export default function Home() {
               onClick={() => setActiveTab("analytics")}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === "analytics"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                  : "text-slate-400 hover:text-slate-200"
+                  : "nav-tab-inactive text-slate-400 hover:text-slate-200"
                 }`}
             >
               <BarChart3 className="w-4 h-4" />
@@ -964,7 +1292,7 @@ export default function Home() {
               onClick={() => setActiveTab("admin")}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === "admin"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                  : "text-slate-400 hover:text-slate-200"
+                  : "nav-tab-inactive text-slate-400 hover:text-slate-200"
                 }`}
             >
               <Lock className="w-4 h-4" />
@@ -2172,21 +2500,7 @@ export default function Home() {
       {/* ========================================================= */}
       {/* 7. DISTINCT BOTTOM FOOTER BAR                            */}
       {/* ========================================================= */}
-      <footer className="relative z-20 w-full bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/90 py-5 mt-12 shadow-2xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-white font-bold tracking-wide">PicoLink</span>
-            <span className="text-slate-600">|</span>
-            <span className="text-slate-300">
-              Powered by <span className="text-indigo-400 font-semibold">Raktch Technology &amp; Software.</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500/80"></span>
-            <span>Enterprise URL Shortener</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
