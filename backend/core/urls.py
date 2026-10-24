@@ -2,6 +2,11 @@ from django.contrib import admin
 from django.urls import path, include
 from shortener.views import RedirectView, HealthzView
 
+# Custom Django Admin Titles
+admin.site.site_header = "PicoLink Administration"
+admin.site.site_title = "PicoLink Admin Portal"
+admin.site.index_title = "Welcome to PicoLink Administration"
+
 urlpatterns = [
     # Django Admin Panel (for superusers)
     path("admin/", admin.site.urls),

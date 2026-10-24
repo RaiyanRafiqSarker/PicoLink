@@ -23,8 +23,16 @@ import {
   Menu,
   Save,
   X,
+  Upload,
+  FileSpreadsheet,
+  Download,
+  AlertCircle,
+  Lock,
+  Flame,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useWorkspace } from "../../../context/WorkspaceContext";
 
 interface LinksTabProps {
   userLinks: any[];
@@ -47,6 +55,7 @@ export default function LinksTab({
   authToken,
   apiBase = "http://localhost:8000",
 }: LinksTabProps) {
+  const { activeWorkspace, isViewer } = useWorkspace();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expired">("all");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -56,6 +65,68 @@ export default function LinksTab({
   const [savingEdit, setSavingEdit] = useState(false);
   const [openKebabId, setOpenKebabId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "compact" | "grid">("list");
+
+  // Phase 2.2: Bulk CSV Shortening State
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+  const [bulkSummary, setBulkSummary] = useState<any | null>(null);
+
+  const downloadSampleCsv = () => {
+    const csvContent = "original_url,custom_slug,campaign_name\nhttps://example.com/promo,summer-sale,summer_2026\nhttps://example.com/docs,,developer_docs\nhttps://mybrand.com/launch,my-launch,launch_q3";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "picolink_bulk_sample.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Sample CSV downloaded!");
+  };
+
+  const handleBulkUpload = async () => {
+    if (isViewer) {
+      toast.error("View-only access in this workspace. Bulk uploading is disabled.");
+      return;
+    }
+
+    if (!csvFile) {
+      toast.error("Please select a .csv file first.");
+      return;
+    }
+
+    setUploadingCsv(true);
+    setBulkSummary(null);
+
+    const formData = new FormData();
+    formData.append("file", csvFile);
+
+    try {
+      const headers: any = {};
+      if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+      if (activeWorkspace) headers["X-Workspace-Id"] = String(activeWorkspace.id);
+
+      const res = await fetch(`${apiBase}/api/v1/shorten/bulk/`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Bulk upload failed.");
+      }
+
+      setBulkSummary(data);
+      toast.success(`Successfully shortened ${data.total_created} URLs in bulk!`);
+      onRefreshLinks();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process bulk CSV.");
+    } finally {
+      setUploadingCsv(false);
+    }
+  };
 
   // Fetch latest links on mount
   useEffect(() => {
@@ -133,21 +204,32 @@ export default function LinksTab({
   };
 
   const handleStartEdit = (link: any) => {
+    if (isViewer) {
+      toast.error("View-only access in this workspace. Editing is disabled.");
+      return;
+    }
     setEditingLinkId(link.id);
     setEditUrlInput(link.original_url);
     setOpenKebabId(null);
   };
 
   const handleSaveEdit = async (id: number) => {
+    if (isViewer) {
+      toast.error("View-only access in this workspace.");
+      return;
+    }
     if (!editUrlInput.trim()) return;
     setSavingEdit(true);
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+      if (activeWorkspace) headers["X-Workspace-Id"] = String(activeWorkspace.id);
+
       const res = await fetch(`${apiBase}/api/v1/user/links/${id}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
+        headers,
         body: JSON.stringify({ original_url: editUrlInput.trim() }),
       });
       if (res.ok) {
@@ -166,6 +248,16 @@ export default function LinksTab({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 py-4">
+      {/* Read-Only / Viewer Mode Notice Banner */}
+      {isViewer && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-medium shadow-sm">
+          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="flex-1">
+            <strong>View-only access:</strong> You have Viewer permissions in <strong>{activeWorkspace?.name || "this workspace"}</strong>. Creating, editing, and deleting links are restricted.
+          </div>
+        </div>
+      )}
+
       {/* 1. Page Title & Action Bar (Matching Screenshot 3) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -185,8 +277,41 @@ export default function LinksTab({
             <RefreshCw className={`w-4 h-4 ${userLinksLoading ? "animate-spin" : ""}`} />
           </button>
           <button
-            onClick={onCreateLinkClick}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition transform hover:-translate-y-0.5"
+            onClick={() => {
+              if (isViewer) {
+                toast.error("View-only access in this workspace.");
+                return;
+              }
+              setCsvFile(null);
+              setBulkSummary(null);
+              setBulkModalOpen(true);
+            }}
+            disabled={isViewer}
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-xs font-semibold shadow-sm transition ${
+              isViewer
+                ? "bg-slate-900/50 border-slate-800/50 text-slate-500 cursor-not-allowed opacity-60"
+                : "bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border-slate-800"
+            }`}
+            title={isViewer ? "View-only access in this workspace" : "Bulk shorten from CSV"}
+          >
+            <Upload className="w-4 h-4 text-indigo-400" />
+            <span>Bulk Upload</span>
+          </button>
+          <button
+            onClick={() => {
+              if (isViewer) {
+                toast.error("View-only access in this workspace.");
+                return;
+              }
+              onCreateLinkClick();
+            }}
+            disabled={isViewer}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition transform ${
+              isViewer
+                ? "bg-slate-800 text-slate-500 cursor-not-allowed opacity-50 shadow-none"
+                : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-600/30 hover:-translate-y-0.5"
+            }`}
+            title={isViewer ? "View-only access in this workspace" : "Create link"}
           >
             <Plus className="w-4 h-4" />
             <span>Create link</span>
@@ -381,8 +506,13 @@ export default function LinksTab({
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => handleStartEdit(link)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-                          title="Edit Destination URL"
+                          disabled={isViewer}
+                          className={`p-1.5 rounded-lg transition ${
+                            isViewer
+                              ? "text-slate-600 cursor-not-allowed opacity-40"
+                              : "text-slate-400 hover:text-white hover:bg-slate-800"
+                          }`}
+                          title={isViewer ? "View-only access in this workspace" : "Edit Destination URL"}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -430,15 +560,17 @@ export default function LinksTab({
                               >
                                 View Stats
                               </button>
-                              <button
-                                onClick={() => {
-                                  toast.info("Link deactivated.");
-                                  setOpenKebabId(null);
-                                }}
-                                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-rose-500/10 text-rose-400"
-                              >
-                                Deactivate
-                              </button>
+                              {!isViewer && (
+                                <button
+                                  onClick={() => {
+                                    toast.info("Link deactivated.");
+                                    setOpenKebabId(null);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded hover:bg-rose-500/10 text-rose-400"
+                                >
+                                  Deactivate
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -516,6 +648,27 @@ export default function LinksTab({
                       </span>
 
                       <span className="text-slate-500">🏷️ No tags</span>
+
+                      {link.campaign_name && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono">
+                          <Target className="w-3 h-3 text-indigo-400" />
+                          <span>{link.campaign_name}</span>
+                        </span>
+                      )}
+
+                      {link.is_password_protected && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                          <Lock className="w-3 h-3 text-amber-400" />
+                          <span>Password</span>
+                        </span>
+                      )}
+
+                      {link.max_clicks && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-300">
+                          <Flame className="w-3 h-3 text-rose-400" />
+                          <span>Max {link.max_clicks} Clicks</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -547,6 +700,128 @@ export default function LinksTab({
           —— You&apos;ve reached the end of your links ——
         </span>
       </div>
+
+      {/* Phase 2.2: Bulk Upload Modal */}
+      {bulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-xl p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-5 text-white max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                  <FileSpreadsheet className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">Bulk CSV Shortening Engine</h3>
+                  <p className="text-[11px] text-slate-400">Upload up to 100 links in a single batch</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setBulkModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Drag & Drop File Zone */}
+            <div className="border-2 border-dashed border-slate-700 hover:border-indigo-500/60 rounded-2xl p-6 text-center space-y-2 bg-slate-950/40 transition">
+              <Upload className="w-8 h-8 text-indigo-400 mx-auto" />
+              <div>
+                <p className="text-xs font-semibold text-slate-200">
+                  {csvFile ? csvFile.name : "Drag & drop your .csv file here"}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {csvFile ? `${(csvFile.size / 1024).toFixed(1)} KB` : "Supports columns: original_url, custom_slug, campaign_name"}
+                </p>
+              </div>
+
+              <input
+                type="file"
+                accept=".csv"
+                id="csv-file-input"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setCsvFile(e.target.files[0]);
+                  }
+                }}
+              />
+              <div className="pt-2 flex items-center justify-center gap-3">
+                <label
+                  htmlFor="csv-file-input"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shadow-md shadow-indigo-600/30 transition"
+                >
+                  Browse Computer
+                </label>
+                <button
+                  type="button"
+                  onClick={downloadSampleCsv}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Sample CSV</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Results summary table if uploaded */}
+            {bulkSummary && (
+              <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-3 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-300">
+                    Batch Processed: {bulkSummary.total_created} Shortened Links
+                  </span>
+                  {bulkSummary.errors?.length > 0 && (
+                    <span className="text-[11px] text-rose-400 font-semibold">
+                      {bulkSummary.errors.length} failed rows
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {bulkSummary.created?.map((link: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-xs"
+                    >
+                      <div className="truncate pr-2">
+                        <span className="font-mono text-indigo-400 font-bold block">{link.short_url}</span>
+                        <span className="text-[10px] text-slate-400 truncate block">↳ {link.original_url}</span>
+                      </div>
+                      <button
+                        onClick={() => handleCopy(link.short_url, link.short_code)}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium shrink-0 transition"
+                      >
+                        {copiedCode === link.short_code ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Footer Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setBulkModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-semibold transition"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                disabled={!csvFile || uploadingCsv}
+                onClick={handleBulkUpload}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition disabled:opacity-40 flex items-center gap-1.5"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>{uploadingCsv ? "Uploading..." : "Start Bulk Shortening"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

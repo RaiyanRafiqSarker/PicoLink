@@ -2,7 +2,17 @@ import re
 from datetime import timedelta
 from django.utils import timezone
 from rest_framework import serializers
-from .models import URL, LinkClick
+from .models import (
+    URL,
+    LinkClick,
+    BioPage,
+    BioPageLink,
+    CustomDomain,
+    ClickWebhook,
+    Workspace,
+    WorkspaceMember,
+    WorkspaceInvitation,
+)
 from .utils.ssrf import validate_url_safety, is_slug_reserved
 
 SLUG_REGEX = re.compile(r"^[a-zA-Z0-9_-]{3,50}$")
@@ -18,10 +28,25 @@ def get_slug_unavailable_reason(slug: str) -> str | None:
         return "taken"
     return None
 
+
 class ShortenRequestSerializer(serializers.Serializer):
     original_url = serializers.CharField(max_length=2048)
     custom_slug = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
     expires_in_days = serializers.IntegerField(required=False, min_value=1, max_value=365, allow_null=True, default=None)
+    
+    # Phase 1: UTM Campaign Tracking
+    campaign_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    
+    # Phase 2: Password & Max Clicks
+    password = serializers.CharField(max_length=128, required=False, allow_blank=True, default="")
+    max_clicks = serializers.IntegerField(required=False, min_value=1, allow_null=True, default=None)
+    
+    # Phase 3: Mobile Deep Linking
+    ios_primary_url = serializers.CharField(max_length=2048, required=False, allow_blank=True, default="")
+    android_primary_url = serializers.CharField(max_length=2048, required=False, allow_blank=True, default="")
+    
+    # Phase 5: Workspace Scoping
+    workspace_id = serializers.IntegerField(required=False, allow_null=True, default=None)
 
     def validate_original_url(self, value):
         is_safe, err_msg = validate_url_safety(value)
@@ -56,10 +81,26 @@ class UpdateLinkDestinationSerializer(serializers.Serializer):
 class URLResponseSerializer(serializers.ModelSerializer):
     short_url = serializers.SerializerMethodField()
     formatted_short_url = serializers.SerializerMethodField()
+    is_password_protected = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = URL
-        fields = ["short_code", "short_url", "formatted_short_url", "original_url", "created_at", "expires_at", "is_active"]
+        fields = [
+            "id",
+            "short_code",
+            "short_url",
+            "formatted_short_url",
+            "original_url",
+            "campaign_name",
+            "is_password_protected",
+            "max_clicks",
+            "ios_primary_url",
+            "android_primary_url",
+            "workspace_id",
+            "created_at",
+            "expires_at",
+            "is_active",
+        ]
 
     def get_short_url(self, obj):
         request = self.context.get("request")
@@ -129,3 +170,165 @@ class GoogleAuthSerializer(serializers.Serializer):
     google_id = serializers.CharField(required=False, allow_blank=True, default="")
     avatar_url = serializers.URLField(required=False, allow_blank=True, default="")
     credential = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+# ==========================================
+# BioPage Serializers (Phase 1)
+# ==========================================
+class BioPageLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BioPageLink
+        fields = ["id", "title", "url", "icon_name", "order", "click_count", "is_active", "badge"]
+
+
+class BioPageSerializer(serializers.ModelSerializer):
+    links = BioPageLinkSerializer(many=True, read_only=True)
+    public_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BioPage
+        fields = [
+            "id",
+            "slug",
+            "title",
+            "bio",
+            "theme_config",
+            "avatar_url",
+            "is_published",
+            "links",
+            "public_url",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_public_url(self, obj):
+        return f"http://localhost:3000/p/{obj.slug}"
+
+
+# ==========================================
+# Custom Domain Serializer (Phase 4)
+# ==========================================
+class CustomDomainSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomDomain
+        fields = ["id", "domain", "status", "ssl_active", "verification_token", "created_at", "updated_at"]
+
+
+# ==========================================
+# Webhook Serializer (Phase 5)
+# ==========================================
+class ClickWebhookSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClickWebhook
+        fields = ["id", "target_url", "secret_key", "is_active", "events", "created_at"]
+        read_only_fields = ["secret_key", "created_at"]
+
+
+# ==========================================
+# Workspace Serializers (Phase 5 - RBAC)
+# ==========================================
+class WorkspaceMemberSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.CharField(source="user.email", read_only=True)
+
+    class Meta:
+        model = WorkspaceMember
+        fields = ["id", "user_id", "username", "email", "role", "joined_at"]
+
+
+class WorkspaceInvitationSerializer(serializers.ModelSerializer):
+    invited_by_username = serializers.CharField(source="invited_by.username", read_only=True)
+    is_expired = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkspaceInvitation
+        fields = [
+            "id",
+            "email",
+            "role",
+            "token",
+            "invited_by_id",
+            "invited_by_username",
+            "created_at",
+            "expires_at",
+            "is_accepted",
+            "is_expired",
+        ]
+
+    def get_is_expired(self, obj):
+        return obj.expires_at < timezone.now()
+
+
+class WorkspaceSerializer(serializers.ModelSerializer):
+    owner_username = serializers.CharField(source="owner.username", read_only=True)
+    members_count = serializers.SerializerMethodField()
+    user_role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Workspace
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "owner_id",
+            "owner_username",
+            "is_personal",
+            "user_role",
+            "members_count",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_members_count(self, obj):
+        return obj.members.count()
+
+    def get_user_role(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return None
+        if obj.owner_id == request.user.id:
+            return "owner"
+        member = obj.members.filter(user=request.user).first()
+        return member.role if member else None
+
+
+class WorkspaceDetailSerializer(serializers.ModelSerializer):
+    owner_username = serializers.CharField(source="owner.username", read_only=True)
+    members = WorkspaceMemberSerializer(many=True, read_only=True)
+    invitations = serializers.SerializerMethodField()
+    user_role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Workspace
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "owner_id",
+            "owner_username",
+            "is_personal",
+            "user_role",
+            "members",
+            "invitations",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_user_role(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return None
+        if obj.owner_id == request.user.id:
+            return "owner"
+        member = obj.members.filter(user=request.user).first()
+        return member.role if member else None
+
+    def get_invitations(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return []
+        role = self.get_user_role(obj)
+        if role in ["owner", "admin"]:
+            pending = obj.invitations.filter(is_accepted=False, expires_at__gte=timezone.now())
+            return WorkspaceInvitationSerializer(pending, many=True).data
+        return []

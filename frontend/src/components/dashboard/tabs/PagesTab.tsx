@@ -23,7 +23,9 @@ import {
   Layers,
   Undo,
   Download,
+  AlertCircle,
 } from "lucide-react";
+import { useWorkspace } from "../../../context/WorkspaceContext";
 
 const IconGithub = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
@@ -44,6 +46,18 @@ const IconTwitter = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
 const IconLinkedin = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
     <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.64 1.64 0 1 0 0-3.28 1.64 1.64 0 0 0 0 3.28m1.39 9.74v-8.37H5.07v8.37h2.78z" />
+  </svg>
+);
+
+const IconInstagram = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+  </svg>
+);
+
+const IconYoutube = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
   </svg>
 );
 import { QRCodeCanvas } from "qrcode.react";
@@ -74,6 +88,7 @@ interface PagesTabProps {
     is_pro?: boolean;
     subscription_tier?: string;
   } | null;
+  apiBase?: string;
 }
 
 const THEME_STYLES: Record<
@@ -148,7 +163,12 @@ const AVATAR_GRADIENTS = [
   "from-cyan-500 to-blue-600",
 ];
 
-export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps) {
+export default function PagesTab({
+  userLinks = [],
+  currentUser,
+  apiBase = "http://localhost:8000",
+}: PagesTabProps) {
+  const { activeWorkspace, isViewer } = useWorkspace();
   // Page Configuration State
   const [handle, setHandle] = useState<string>(currentUser?.username || "creator");
   const [title, setTitle] = useState<string>(
@@ -167,6 +187,8 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
   const [socialTwitter, setSocialTwitter] = useState("https://x.com");
   const [socialGithub, setSocialGithub] = useState("https://github.com");
   const [socialLinkedin, setSocialLinkedin] = useState("");
+  const [socialInstagram, setSocialInstagram] = useState("");
+  const [socialYoutube, setSocialYoutube] = useState("");
   const [socialEmail, setSocialEmail] = useState("");
 
   // Links List
@@ -224,6 +246,8 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
           setSocialTwitter(parsed.socials.twitter || "");
           setSocialGithub(parsed.socials.github || "");
           setSocialLinkedin(parsed.socials.linkedin || "");
+          setSocialInstagram(parsed.socials.instagram || "");
+          setSocialYoutube(parsed.socials.youtube || "");
           setSocialEmail(parsed.socials.email || "");
         }
       }
@@ -232,34 +256,14 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
     }
   }, []);
 
-  // Save to LocalStorage
-  const handleSavePage = () => {
-    try {
-      const data = {
-        handle,
-        title,
-        bio,
-        theme,
-        buttonShape,
-        avatarGradient,
-        links,
-        socials: {
-          twitter: socialTwitter,
-          github: socialGithub,
-          linkedin: socialLinkedin,
-          email: socialEmail,
-        },
-      };
-      localStorage.setItem("picolink_bio_page", JSON.stringify(data));
-      toast.success("Link-in-Bio page saved and published successfully!");
-    } catch {
-      toast.error("Could not save page configuration.");
-    }
-  };
 
   // Add Link
   const handleAddLink = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isViewer) {
+      toast.error("View-only access in this workspace. Adding links is disabled.");
+      return;
+    }
     if (!newTitle.trim() || !newUrl.trim()) {
       toast.error("Please provide both a link title and URL.");
       return;
@@ -333,10 +337,128 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  // Load page from backend API or localStorage
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("picolink_token") : null;
+    if (token) {
+      const endpoint = `${apiBase.replace(/\/$/, "")}/api/v1/pages/my-page/`;
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (activeWorkspace) {
+        headers["X-Workspace-Id"] = String(activeWorkspace.id);
+      }
+      fetch(endpoint, { headers })
+        .then((r) => r.ok && r.json())
+        .then((data) => {
+          if (data && data.slug) {
+            setHandle(data.slug);
+            if (data.title) setTitle(data.title);
+            if (data.bio) setBio(data.bio);
+            if (data.theme_config) {
+              if (data.theme_config.theme) setTheme(data.theme_config.theme as BioTheme);
+              if (data.theme_config.shape) setButtonShape(data.theme_config.shape);
+              if (data.theme_config.twitter) setSocialTwitter(data.theme_config.twitter);
+              if (data.theme_config.github) setSocialGithub(data.theme_config.github);
+              if (data.theme_config.linkedin) setSocialLinkedin(data.theme_config.linkedin);
+              if (data.theme_config.instagram) setSocialInstagram(data.theme_config.instagram);
+              if (data.theme_config.youtube) setSocialYoutube(data.theme_config.youtube);
+              if (data.theme_config.email) setSocialEmail(data.theme_config.email);
+            }
+            if (data.links && data.links.length > 0) {
+              setLinks(
+                data.links.map((l: any) => ({
+                  id: String(l.id),
+                  title: l.title,
+                  url: l.url,
+                  badge: l.badge || undefined,
+                  isActive: l.is_active ?? true,
+                  clicks: l.click_count || 0,
+                }))
+              );
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [apiBase, activeWorkspace?.id]);
+
+  // Save / Publish Bio Page to Backend
+  const [publishing, setPublishing] = useState(false);
+  const handleSavePage = async () => {
+    if (isViewer) {
+      toast.error("View-only access in this workspace. You cannot edit or publish bio pages.");
+      return;
+    }
+
+    setPublishing(true);
+    const cleanSlug = handle.replace(/^@/, "").toLowerCase().trim() || "creator";
+    const payload: any = {
+      slug: cleanSlug,
+      title: title.trim(),
+      bio: bio.trim(),
+      theme_config: {
+        theme,
+        shape: buttonShape,
+        avatar_gradient: avatarGradient,
+        twitter: socialTwitter.trim(),
+        github: socialGithub.trim(),
+        linkedin: socialLinkedin.trim(),
+        instagram: socialInstagram.trim(),
+        youtube: socialYoutube.trim(),
+        email: socialEmail.trim(),
+      },
+      links: links.map((l) => ({
+        title: l.title,
+        url: l.url,
+        badge: l.badge || "",
+        isActive: l.isActive,
+      })),
+      is_published: true,
+    };
+    if (activeWorkspace) {
+      payload.workspace_id = activeWorkspace.id;
+    }
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("picolink_token") : null;
+      if (token) {
+        const endpoint = `${apiBase.replace(/\/$/, "")}/api/v1/pages/save/`;
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        };
+        if (activeWorkspace) {
+          headers["X-Workspace-Id"] = String(activeWorkspace.id);
+        }
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to publish page.");
+        }
+      }
+      localStorage.setItem("picolink_bio_page", JSON.stringify(payload));
+      toast.success("Link-in-Bio published live!", {
+        description: `Visit at http://localhost:3000/p/${cleanSlug}`,
+        action: {
+          label: "View Page",
+          onClick: () => window.open(`http://localhost:3000/p/${cleanSlug}`, "_blank"),
+        },
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save bio page.");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   // Copy Public Bio Link
-  const fullShareUrl = `https://picolink.dev/@${handle.replace(/^@/, "")}`;
+  const publicPathUrl = `http://localhost:3000/p/${handle.replace(/^@/, "")}`;
   const handleCopyShareUrl = () => {
-    navigator.clipboard.writeText(fullShareUrl);
+    navigator.clipboard.writeText(publicPathUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
     toast.success("Bio link copied to clipboard!");
@@ -360,6 +482,16 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
 
   return (
     <div className="max-w-7xl mx-auto py-2 space-y-6">
+      {/* Read-Only / Viewer Mode Notice Banner */}
+      {isViewer && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-medium shadow-sm">
+          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="flex-1">
+            <strong>View-only access:</strong> You have Viewer permissions in <strong>{activeWorkspace?.name || "this workspace"}</strong>. Editing, adding links, and publishing bio pages are restricted.
+          </div>
+        </div>
+      )}
+
       {/* Top Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-xl">
         <div className="flex items-center gap-3">
@@ -384,13 +516,13 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300">
             <Globe className="w-3.5 h-3.5 text-indigo-500" />
             <span className="font-semibold text-indigo-600 dark:text-indigo-400 truncate max-w-[140px] sm:max-w-[200px]">
-              picolink.dev/@{handle}
+              /p/{handle.replace(/^@/, "")}
             </span>
           </div>
 
           <button
             onClick={handleCopyShareUrl}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium border border-slate-300 dark:border-slate-700 transition"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-medium border border-slate-300 dark:border-slate-700 transition"
             title="Copy shareable link"
           >
             {copiedLink ? (
@@ -401,17 +533,34 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5" />
-                <span>Copy Link</span>
+                <span>Copy</span>
               </>
             )}
           </button>
 
+          <a
+            href={`/p/${handle.replace(/^@/, "")}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-medium border border-slate-300 dark:border-slate-700 transition"
+            title="Open live visitor page in new tab"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">View Live</span>
+          </a>
+
           <button
             onClick={handleSavePage}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/25 transition"
+            disabled={publishing || isViewer}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold shadow-md transition ${
+              isViewer
+                ? "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-50 shadow-none"
+                : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-600/25 disabled:opacity-50"
+            }`}
+            title={isViewer ? "View-only access in this workspace" : "Publish Page"}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Publish Page</span>
+            <span>{publishing ? "Publishing..." : "Publish Page"}</span>
           </button>
         </div>
       </div>
@@ -541,7 +690,13 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
                     </div>
                     <button
                       type="submit"
-                      className="w-full sm:w-auto px-5 py-2 mt-4 sm:mt-0 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/30 transition flex items-center justify-center gap-1.5 shrink-0"
+                      disabled={isViewer}
+                      className={`w-full sm:w-auto px-5 py-2 mt-4 sm:mt-0 rounded-xl font-semibold text-xs transition flex items-center justify-center gap-1.5 shrink-0 ${
+                        isViewer
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-50"
+                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30"
+                      }`}
+                      title={isViewer ? "View-only access in this workspace" : "Add to Bio"}
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add to Bio</span>
@@ -773,6 +928,28 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
                   </div>
 
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                    <IconInstagram className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                    <input
+                      type="text"
+                      value={socialInstagram}
+                      onChange={(e) => setSocialInstagram(e.target.value)}
+                      placeholder="Instagram URL (optional)"
+                      className="bg-transparent w-full text-slate-900 dark:text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                    <IconYoutube className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <input
+                      type="text"
+                      value={socialYoutube}
+                      onChange={(e) => setSocialYoutube(e.target.value)}
+                      placeholder="YouTube URL (optional)"
+                      className="bg-transparent w-full text-slate-900 dark:text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                     <Mail className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                     <input
                       type="email"
@@ -877,7 +1054,7 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
                 <div className="hidden">
                   <QRCodeCanvas
                     ref={qrCanvasRef}
-                    value={fullShareUrl}
+                    value={publicPathUrl}
                     size={240}
                     fgColor="#1e1b4b"
                     bgColor="#ffffff"
@@ -893,15 +1070,15 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
         <div className="lg:col-span-5 flex flex-col items-center">
           <div className="sticky top-6 w-full max-w-[340px]">
             {/* Phone Shell with realistic bezel, speaker notch & shadow */}
-            <div className="relative mx-auto w-full rounded-[42px] p-3 bg-slate-950 shadow-2xl ring-1 ring-slate-800 border-4 border-slate-900">
+            <div className="phone-mockup-frame relative mx-auto w-full rounded-[42px] p-3 bg-slate-950 shadow-2xl ring-1 ring-slate-800 border-4 border-slate-900 transition-colors">
               {/* Dynamic Island / Camera Notch */}
-              <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-black rounded-full z-30 flex items-center justify-center">
+              <div className="dynamic-island absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-black rounded-full z-30 flex items-center justify-center">
                 <div className="w-2.5 h-2.5 rounded-full bg-slate-900/80 mr-2" />
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-950" />
               </div>
 
               {/* Status Bar */}
-              <div className="relative z-20 flex justify-between items-center px-6 pt-3 text-[10px] text-white/70 font-semibold select-none">
+              <div className="status-bar relative z-20 flex justify-between items-center px-6 pt-3 text-[10px] text-white/80 font-semibold select-none">
                 <span>9:41</span>
                 <div className="flex items-center gap-1.5">
                   <span>5G</span>
@@ -913,7 +1090,7 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
 
               {/* Phone Screen Canvas */}
               <div
-                className={`w-full min-h-[560px] max-h-[600px] overflow-y-auto rounded-[34px] p-5 pt-8 bg-gradient-to-b ${currentTheme.bgStyle} flex flex-col justify-between scrollbar-none transition-all duration-300`}
+                className={`phone-screen w-full min-h-[560px] max-h-[600px] overflow-y-auto rounded-[34px] p-5 pt-8 bg-gradient-to-b ${currentTheme.bgStyle} flex flex-col justify-between scrollbar-none transition-all duration-300`}
               >
                 {/* Profile Header */}
                 <div className="text-center space-y-3">
@@ -930,26 +1107,26 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
                   </div>
 
                   <div>
-                    <h3 className={`text-base font-extrabold ${currentTheme.textPrimary} tracking-tight`}>
+                    <h3 className={`bio-profile-title text-base font-extrabold ${currentTheme.textPrimary} tracking-tight`}>
                       {title || "Your Name"}
                     </h3>
-                    <p className="text-[11px] font-mono text-indigo-400 mt-0.5">
+                    <p className="bio-profile-handle text-[11px] font-mono text-indigo-400 mt-0.5">
                       @{handle || "handle"}
                     </p>
-                    <p className={`text-xs ${currentTheme.textSecondary} mt-1.5 leading-relaxed max-w-[240px] mx-auto`}>
+                    <p className={`bio-profile-description text-xs ${currentTheme.textSecondary} mt-1.5 leading-relaxed max-w-[240px] mx-auto`}>
                       {bio || "Add a quick bio description to engage your visitors."}
                     </p>
                   </div>
 
                   {/* Social Channels Icons Strip */}
-                  {(socialTwitter || socialGithub || socialLinkedin || socialEmail) && (
-                    <div className="flex items-center justify-center gap-3 pt-1">
+                  {(socialTwitter || socialGithub || socialLinkedin || socialInstagram || socialYoutube || socialEmail) && (
+                    <div className="flex items-center justify-center gap-2.5 pt-1 flex-wrap">
                       {socialTwitter && (
                         <a
                           href={socialTwitter}
                           target="_blank"
                           rel="noreferrer"
-                          className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                          className="bio-social-icon w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
                         >
                           <IconTwitter className="w-3.5 h-3.5" />
                         </a>
@@ -959,7 +1136,7 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
                           href={socialGithub}
                           target="_blank"
                           rel="noreferrer"
-                          className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                          className="bio-social-icon w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
                         >
                           <IconGithub className="w-3.5 h-3.5" />
                         </a>
@@ -969,15 +1146,35 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
                           href={socialLinkedin}
                           target="_blank"
                           rel="noreferrer"
-                          className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                          className="bio-social-icon w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
                         >
                           <IconLinkedin className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      {socialInstagram && (
+                        <a
+                          href={socialInstagram}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="bio-social-icon w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                        >
+                          <IconInstagram className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      {socialYoutube && (
+                        <a
+                          href={socialYoutube}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="bio-social-icon w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                        >
+                          <IconYoutube className="w-3.5 h-3.5" />
                         </a>
                       )}
                       {socialEmail && (
                         <a
                           href={`mailto:${socialEmail}`}
-                          className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                          className="bio-social-icon w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
                         >
                           <Mail className="w-3.5 h-3.5" />
                         </a>
@@ -1000,9 +1197,9 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
                           key={link.id}
                           type="button"
                           onClick={() => handlePreviewLinkClick(link.id, link.url)}
-                          className={`w-full group p-3 text-xs font-semibold flex items-center justify-between gap-2 transition-all transform active:scale-95 ${buttonShape} ${currentTheme.btnClass}`}
+                          className={`bio-link-btn w-full group p-3 text-xs font-semibold flex items-center justify-between gap-2 transition-all transform active:scale-95 ${buttonShape} ${currentTheme.btnClass}`}
                         >
-                          <span className="truncate text-left">{link.title}</span>
+                          <span className="truncate text-left text-white">{link.title}</span>
 
                           <div className="flex items-center gap-1.5 shrink-0">
                             {link.badge && (
@@ -1012,7 +1209,7 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
                                 {link.badge}
                               </span>
                             )}
-                            <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition" />
+                            <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 text-white transition" />
                           </div>
                         </button>
                       ))
@@ -1021,9 +1218,9 @@ export default function PagesTab({ userLinks = [], currentUser }: PagesTabProps)
 
                 {/* Footer Badge inside Phone */}
                 <div className="pt-4 pb-2 text-center">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[10px] text-white/70">
+                  <div className="bio-footer-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[10px] text-white/70">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                    <span>Powered by PicoLink</span>
+                    <span className="text-white/80 font-medium">Powered by PicoLink</span>
                   </div>
                 </div>
               </div>

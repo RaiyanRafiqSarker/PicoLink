@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --background: #080d1a;
   --foreground: #f1f5f9;
@@ -21,18 +23,6 @@ html.light, [data-theme="light"] {
   color-scheme: light;
   --background: #f8fafc;
   --foreground: #0f172a;
-
-  /* Remap slate tokens for clean Light theme */
-  --color-slate-950: #ffffff;
-  --color-slate-900: #ffffff;
-  --color-slate-800: #e2e8f0;
-  --color-slate-700: #cbd5e1;
-  --color-slate-600: #64748b;
-  --color-slate-500: #64748b;
-  --color-slate-400: #475569;
-  --color-slate-300: #1e293b;
-  --color-slate-200: #0f172a;
-  --color-slate-100: #020617;
 }
 
 body {
@@ -52,8 +42,41 @@ html.light .theme-root {
   color: #0f172a !important;
 }
 
-html.light .bg-\[\#080d1a\] {
+html.light [class*="bg-[#080d1a]"],
+html.light [class*="bg-[#070b16]"],
+html.light [class*="bg-[#070e1e]"],
+html.light .bg-\[\#080d1a\],
+html.light .bg-\[\#070b16\],
+html.light .bg-\[\#070e1e\] {
   background-color: #f8fafc !important;
+}
+
+/* Hero subtitles in light mode */
+html.light .url-shortener-subtitle,
+html.light .qr-code-subtitle,
+html.light .pages-subtitle,
+html.light .hero-subtitle {
+  color: #475569 !important;
+}
+
+/* Free Plan Value Banner above footer */
+html.light .free-plan-banner {
+  background-color: #f1f5f9 !important;
+  border-top-color: #e2e8f0 !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+html.light .free-plan-banner-title,
+html.light .free-plan-banner-title * {
+  color: #0f172a !important;
+}
+
+html.light .free-plan-banner-title button:hover {
+  color: #ea580c !important;
+}
+
+html.light .free-plan-banner-item {
+  color: #334155 !important;
 }
 
 /* Navbar / Header */
@@ -136,7 +159,8 @@ html.light .header-quota-badge.pro-tier {
   color: #6b21a8 !important;
 }
 
-/* Header Buttons: User Dropdown & Theme Toggle */
+/* Header Buttons: Workspace Selector, User Dropdown & Theme Toggle */
+html.light .header-workspace-btn,
 html.light .header-user-btn,
 html.light .header-theme-btn {
   background-color: #f1f5f9 !important;
@@ -144,15 +168,27 @@ html.light .header-theme-btn {
   color: #0f172a !important;
 }
 
+html.light .header-workspace-btn:hover,
 html.light .header-user-btn:hover,
 html.light .header-theme-btn:hover {
   background-color: #e2e8f0 !important;
   color: #020617 !important;
 }
 
+html.light .header-workspace-btn > span,
 html.light .header-user-btn span,
 html.light .header-theme-btn span {
   color: #0f172a !important;
+}
+
+html.light .header-workspace-btn span[class*="bg-indigo-"] {
+  color: #4338ca !important;
+  background-color: #e0e7ff !important;
+}
+
+html.light .header-workspace-btn span[class*="bg-teal-"] {
+  color: #0f766e !important;
+  background-color: #ccfbf1 !important;
 }
 
 html.light .header-user-dropdown {
@@ -202,19 +238,80 @@ html.light textarea::placeholder {
 }
 
 /* General Typography in Light Mode */
-html.light h1,
-html.light h2,
-html.light h3,
-html.light h4,
-html.light .text-white {
+html.light h1:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light h2:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light h3:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light h4:not(.phone-mockup-frame *):not(.bio-public-page *) {
   color: #0f172a !important;
 }
 
-/* Retain high-contrast white text on solid/gradient buttons only */
+/* Ensure text-white on regular content maps to dark slate in light mode, but never affects buttons, colored pills, badges or gradients */
+html.light .text-white:not(button):not(button *):not(a.btn):not(.btn *):not(.phone-mockup-frame *):not(.bio-public-page *):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-teal-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-blue-"]):not([class*="bg-slate-900"]):not([class*="bg-slate-950"]):not([class*="bg-black"]):not([class*="from-"]):not([class*="to-"]) {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-900 {
+  color: #0f172a !important;
+}
+
+/* Google OAuth Button */
+.btn-google {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.btn-google:hover:not(:disabled) {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+.btn-google span,
+.btn-google p,
+.btn-google strong {
+  color: #1e293b !important;
+}
+
+.btn-google:hover:not(:disabled) span,
+.btn-google:hover:not(:disabled) p,
+.btn-google:hover:not(:disabled) strong {
+  color: #0f172a !important;
+}
+
+html.dark .btn-google {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+html.dark .btn-google:hover:not(:disabled) {
+  background-color: #f1f5f9 !important;
+}
+
+html.dark .btn-google span,
+html.dark .btn-google p,
+html.dark .btn-google strong {
+  color: #0f172a !important;
+}
+
+/* Retain high-contrast pure white text on solid/gradient buttons ONLY */
 html.light button.bg-indigo-600,
 html.light button.bg-indigo-600 *,
+html.light button.bg-indigo-500,
+html.light button.bg-indigo-500 *,
 html.light a.bg-indigo-600,
 html.light a.bg-indigo-600 *,
+html.light button.bg-purple-600,
+html.light button.bg-purple-600 *,
+html.light button.bg-teal-600,
+html.light button.bg-teal-600 *,
+html.light button.bg-emerald-600,
+html.light button.bg-emerald-600 *,
+html.light button.bg-rose-600,
+html.light button.bg-rose-600 *,
+html.light button.bg-blue-600,
+html.light button.bg-blue-600 *,
 html.light button.bg-gradient-to-r,
 html.light button.bg-gradient-to-r *,
 html.light .btn-solid-primary,
@@ -226,26 +323,86 @@ html.light .ambient-glow {
   opacity: 0.15 !important;
 }
 
-/* Cards & Modals */
-html.light .bg-slate-900\/60,
-html.light .bg-slate-900\/80,
-html.light .bg-slate-900\/95,
-html.light .bg-slate-950\/60,
-html.light .bg-slate-950\/70,
-html.light .bg-slate-950\/80,
-html.light .bg-slate-950\/85,
-html.light .bg-slate-950\/95 {
-  background-color: rgba(255, 255, 255, 0.96) !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
+/* Cards & Containers in Light Mode (strictly non-overlay cards) */
+html.light .bg-slate-900:not([class*="fixed"]):not(button.bg-slate-900):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-900\/90:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-900\/95:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-900\/80:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-900\/60:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-900\/50:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *) {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+  border-color: #e2e8f0 !important;
 }
 
-html.light .border-slate-800,
-html.light .border-slate-800\/60,
-html.light .border-slate-800\/80,
-html.light .border-slate-800\/90,
-html.light .border-slate-700,
-html.light .border-slate-700\/80 {
+/* Secondary Inner Surfaces, Wells & Cards */
+html.light .bg-slate-950:not([class*="fixed"]):not(button):not(input):not(select):not(textarea):not(.phone-mockup-frame):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-950\/60:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-950\/70:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-950\/80:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-950\/85:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-950\/90:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .bg-slate-950\/95:not([class*="fixed"]):not(.phone-mockup-frame *):not(.bio-public-page *) {
+  background-color: #f8fafc !important;
   border-color: #e2e8f0 !important;
+}
+
+/* Secondary buttons & pills styled with dark slate */
+html.light button.bg-slate-800:not(.btn-solid-primary):not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not([class*="bg-teal-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-cyan-"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light button.bg-slate-850:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light button.bg-slate-900:not([class*="bg-indigo-"]):not([class*="bg-purple-"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light a.bg-slate-800:not([class*="bg-indigo-"]):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light a.bg-slate-900:not([class*="bg-indigo-"]):not(.phone-mockup-frame *):not(.bio-public-page *) {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+html.light button.bg-slate-800:hover:not(:disabled):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light button.bg-slate-850:hover:not(:disabled):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light button.bg-slate-900:hover:not(:disabled):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light a.bg-slate-800:hover:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light a.bg-slate-900:hover:not(.phone-mockup-frame *):not(.bio-public-page *) {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Modal and Drawer Backdrop Overlays - maintain clean translucent blur in Light Mode */
+html.light div[class*="fixed"][class*="inset-0"][class*="bg-slate-950"],
+html.light div[class*="fixed"][class*="inset-0"][class*="bg-black"],
+html.light div[class*="fixed"][class*="inset-0"].backdrop-blur-sm,
+html.light div[class*="fixed"][class*="inset-0"].backdrop-blur-md {
+  background-color: rgba(15, 23, 42, 0.55) !important;
+  box-shadow: none !important;
+}
+
+/* Slate Borders */
+html.light .border-slate-800:not(.phone-mockup-frame):not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .border-slate-800\/60:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .border-slate-800\/80:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .border-slate-800\/90:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .border-slate-700:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .border-slate-700\/60:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .border-slate-700\/80:not(.phone-mockup-frame *):not(.bio-public-page *),
+html.light .border-slate-850:not(.phone-mockup-frame *):not(.bio-public-page *) {
+  border-color: #e2e8f0 !important;
+}
+
+/* High contrast secondary and muted text in Light Mode */
+html.light .text-slate-400:not(.phone-mockup-frame *):not(.bio-public-page *) {
+  color: #64748b !important;
+}
+
+html.light .text-slate-300:not(button *):not([class*="bg-indigo-"] *):not([class*="bg-purple-"] *):not([class*="bg-teal-"] *):not([class*="bg-emerald-"] *):not(.phone-mockup-frame *):not(.bio-public-page *) {
+  color: #475569 !important;
+}
+
+html.light .text-slate-200:not(button *):not([class*="bg-indigo-"] *):not([class*="bg-purple-"] *):not([class*="bg-teal-"] *):not([class*="bg-emerald-"] *):not(.phone-mockup-frame *):not(.bio-public-page *) {
+  color: #334155 !important;
+}
+
+html.light .text-slate-100:not(button *):not([class*="bg-indigo-"] *):not([class*="bg-purple-"] *):not([class*="bg-teal-"] *):not([class*="bg-emerald-"] *):not(.phone-mockup-frame *):not(.bio-public-page *) {
+  color: #1e293b !important;
 }
 
 /* Promotional Callout Banners (e.g. Complimentary domain banner) */
@@ -286,3 +443,293 @@ html.light .promo-banner .promo-btn:hover {
   color: #064e3b !important;
   text-decoration-thickness: 2px !important;
 }
+
+/* ========================================================= */
+/* PRICING PLANS VIEW - LIGHT / WHITE MODE REFINEMENTS        */
+/* ========================================================= */
+
+html.light .pricing-plans-page {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light .pricing-plans-page .pricing-header {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+html.light .pricing-plans-page .pricing-title {
+  color: #0f172a !important;
+}
+
+html.light .pricing-plans-page .pricing-subtitle {
+  color: #475569 !important;
+}
+
+html.light .pricing-plans-page .pricing-toggle-wrap {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .pricing-plans-page .pricing-toggle-active {
+  background-color: #ffffff !important;
+  color: #2563eb !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .pricing-plans-page .pricing-toggle-inactive {
+  color: #64748b !important;
+}
+
+html.light .pricing-plans-page .pricing-toggle-inactive:hover {
+  color: #0f172a !important;
+}
+
+html.light .pricing-plans-page .pricing-banner {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
+}
+
+html.light .pricing-plans-page .pricing-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .pricing-plans-page .pricing-card-growth {
+  background-color: #ffffff !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 12px 24px -4px rgba(37, 99, 235, 0.12) !important;
+}
+
+html.light .pricing-plans-page .pricing-card-title {
+  color: #0f172a !important;
+}
+
+html.light .pricing-plans-page .pricing-card-desc {
+  color: #64748b !important;
+}
+
+html.light .pricing-plans-page .pricing-card-price {
+  color: #0f172a !important;
+}
+
+html.light .pricing-plans-page .pricing-card-period {
+  color: #64748b !important;
+}
+
+html.light .pricing-plans-page .pricing-card-feature-header {
+  color: #0f172a !important;
+}
+
+html.light .pricing-plans-page .pricing-card-feature {
+  color: #334155 !important;
+}
+
+html.light .pricing-plans-page .pricing-table {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .pricing-plans-page .pricing-table thead tr {
+  background-color: #f8fafc !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+html.light .pricing-plans-page .pricing-table th {
+  color: #0f172a !important;
+}
+
+html.light .pricing-plans-page .pricing-table th .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .pricing-plans-page .pricing-category-row {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .pricing-plans-page .pricing-category-row td,
+html.light .pricing-plans-page .pricing-category-row span {
+  color: #0f172a !important;
+}
+
+html.light .pricing-plans-page .pricing-feature-row {
+  background-color: #ffffff !important;
+  border-bottom-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+html.light .pricing-plans-page .pricing-feature-row-alt {
+  background-color: #f8fafc !important;
+  border-bottom-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+html.light .pricing-plans-page .pricing-feature-row:hover,
+html.light .pricing-plans-page .pricing-feature-row-alt:hover {
+  background-color: #eff6ff !important;
+}
+
+html.light .pricing-plans-page .pricing-feature-row td,
+html.light .pricing-plans-page .pricing-feature-row-alt td {
+  color: #1e293b !important;
+}
+
+html.light .pricing-plans-page .pricing-table-growth-col {
+  background-color: rgba(239, 246, 255, 0.6) !important;
+  border-left-color: #dbeafe !important;
+  border-right-color: #dbeafe !important;
+}
+
+html.light .pricing-plans-page .pricing-cell-value,
+html.light .pricing-plans-page .pricing-table td .pricing-cell-value,
+html.light .pricing-plans-page .pricing-table td span.pricing-cell-value {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+html.light .pricing-plans-page .pricing-cell-dash {
+  color: #94a3b8 !important;
+}
+
+html.light .pricing-plans-page .pricing-card-feature,
+html.light .pricing-plans-page .pricing-card-feature strong {
+  color: #0f172a !important;
+}
+
+/* ========================================================= */
+/* CREATE NEW MODAL - LIGHT MODE REFINEMENTS                 */
+/* ========================================================= */
+
+html.light .create-modal-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.light .create-modal-tile {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .create-modal-tile:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #818cf8 !important;
+}
+
+html.light .create-modal-tile kbd {
+  background-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+/* ========================================================================= */
+/* SMARTPHONE BIO-PAGE MOCKUP & BIO PAGES - LIGHT MODE CONTRAST & INTEGRITY */
+/* ========================================================================= */
+
+.phone-mockup-frame,
+html.light .phone-mockup-frame {
+  background-color: #030712 !important;
+  border-color: #0f172a !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.phone-mockup-frame .dynamic-island,
+html.light .phone-mockup-frame .dynamic-island {
+  background-color: #000000 !important;
+}
+
+.phone-mockup-frame .status-bar,
+html.light .phone-mockup-frame .status-bar {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.phone-mockup-frame .status-bar span,
+html.light .phone-mockup-frame .status-bar span {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.phone-mockup-frame .bio-profile-title,
+html.light .phone-mockup-frame .bio-profile-title {
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.phone-mockup-frame .bio-profile-handle,
+html.light .phone-mockup-frame .bio-profile-handle {
+  color: #818cf8 !important;
+}
+
+.phone-mockup-frame .bio-profile-description,
+html.light .phone-mockup-frame .bio-profile-description {
+  color: #94a3b8 !important;
+}
+
+.phone-mockup-frame .bio-social-icon,
+html.light .phone-mockup-frame .bio-social-icon {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+.phone-mockup-frame .bio-social-icon:hover,
+html.light .phone-mockup-frame .bio-social-icon:hover {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+.phone-mockup-frame .bio-social-icon svg,
+html.light .phone-mockup-frame .bio-social-icon svg {
+  color: #ffffff !important;
+  fill: currentColor !important;
+}
+
+/* Ensure link titles inside buttons stay crisp and visible */
+.phone-mockup-frame .bio-link-btn,
+html.light .phone-mockup-frame .bio-link-btn {
+  color: #ffffff !important;
+}
+
+.phone-mockup-frame .bio-link-btn span,
+html.light .phone-mockup-frame .bio-link-btn span {
+  color: inherit !important;
+}
+
+.phone-mockup-frame .bio-link-btn svg,
+html.light .phone-mockup-frame .bio-link-btn svg {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Footer Badge inside Phone Mockup */
+.phone-mockup-frame .bio-footer-badge,
+html.light .phone-mockup-frame .bio-footer-badge {
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.phone-mockup-frame .bio-footer-badge span,
+html.light .phone-mockup-frame .bio-footer-badge span {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Public Bio Page Immunity */
+.bio-public-page h1,
+html.light .bio-public-page h1 {
+  color: inherit !important;
+}
+
+.bio-public-page p,
+html.light .bio-public-page p {
+  color: inherit !important;
+}
+
+.bio-public-page button,
+html.light .bio-public-page button {
+  color: inherit !important;
+}
+
+
+
+

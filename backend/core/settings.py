@@ -121,12 +121,18 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+from corsheaders.defaults import default_headers
+
 # CORS configuration for Next.js frontend
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
     r"^http://127\.0\.0\.1:\d+$",
+]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-workspace-id",
+    "x-picolink-signature",
 ]
 
 # REST Framework settings
@@ -154,3 +160,46 @@ REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
 REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", None)
 
 BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8000")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+
+# Stripe Billing Configuration
+STRIPE_PUBLIC_KEY = os.environ.get("STRIPE_PUBLIC_KEY", "pk_test_sample_picolink_key")
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "sk_test_sample_picolink_key")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "whsec_sample_picolink_secret")
+
+STRIPE_PLAN_PRICES = {
+    "core": {
+        "monthly": 1000,   # $10.00
+        "annual": 9600,    # $8.00/mo ($96.00/yr)
+    },
+    "pro": {
+        "monthly": 3500,   # $35.00
+        "annual": 34800,   # $29.00/mo ($348.00/yr - save 17%)
+    },
+    "growth": {
+        "monthly": 3500,   # $35.00
+        "annual": 34800,   # $29.00/mo ($348.00/yr)
+    },
+    "premium": {
+        "monthly": 19900,  # $199.00
+        "annual": 178800,  # $149.00/mo ($1788.00/yr)
+    },
+}
+
+# Transactional Email (Raktch Mail SMTP)
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'mail.raktch.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 't')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'raktch@raktch.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD') or os.getenv('Raktch@raktch123') or 'Raktch@raktch123'
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Raktch Mail <raktch@raktch.com>')
+SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+# Ensure templates context processors
+if 'django.template.context_processors.request' not in TEMPLATES[0]['OPTIONS']['context_processors']:
+    TEMPLATES[0]['OPTIONS']['context_processors'].append('django.template.context_processors.request')
+
+

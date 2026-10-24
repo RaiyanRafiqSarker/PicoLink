@@ -20,8 +20,17 @@ import {
   ChevronRight,
   Zap,
   Info,
+  SlidersHorizontal,
+  Lock,
+  Flame,
+  Target,
+  Smartphone,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useWorkspace } from "../../../context/WorkspaceContext";
 
 interface HomeTabProps {
   urlInput: string;
@@ -31,6 +40,16 @@ interface HomeTabProps {
   slugStatus: "idle" | "checking" | "available" | "taken" | "invalid";
   expiresInput: string;
   setExpiresInput: (val: string) => void;
+  campaignInput?: string;
+  setCampaignInput?: (val: string) => void;
+  passwordInput?: string;
+  setPasswordInput?: (val: string) => void;
+  maxClicksInput?: string;
+  setMaxClicksInput?: (val: string) => void;
+  iosUrlInput?: string;
+  setIosUrlInput?: (val: string) => void;
+  androidUrlInput?: string;
+  setAndroidUrlInput?: (val: string) => void;
   shortenLoading: boolean;
   handleShorten: (e: React.FormEvent) => void;
   shortenResult: any;
@@ -40,6 +59,7 @@ interface HomeTabProps {
   onUpgradePro: () => void;
   onNavigateToLinks: () => void;
   onNavigateToQr: () => void;
+  onNavigateToIntegrations?: () => void;
   userLinksCount: number;
 }
 
@@ -51,6 +71,16 @@ export default function HomeTab({
   slugStatus,
   expiresInput,
   setExpiresInput,
+  campaignInput = "",
+  setCampaignInput,
+  passwordInput = "",
+  setPasswordInput,
+  maxClicksInput = "",
+  setMaxClicksInput,
+  iosUrlInput = "",
+  setIosUrlInput,
+  androidUrlInput = "",
+  setAndroidUrlInput,
   shortenLoading,
   handleShorten,
   shortenResult,
@@ -60,11 +90,57 @@ export default function HomeTab({
   onUpgradePro,
   onNavigateToLinks,
   onNavigateToQr,
+  onNavigateToIntegrations,
   userLinksCount,
 }: HomeTabProps) {
+  const { activeWorkspace, isViewer } = useWorkspace();
   const [createMode, setCreateMode] = useState<"short" | "qr">("short");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showUtmBuilder, setShowUtmBuilder] = useState(false);
   const [integrationPage, setIntegrationPage] = useState(0);
+
+  // UTM Parameters State
+  const [utmSource, setUtmSource] = useState("");
+  const [utmMedium, setUtmMedium] = useState("");
+  const [utmCampaign, setUtmCampaign] = useState("");
+  const [utmTerm, setUtmTerm] = useState("");
+  const [utmContent, setUtmContent] = useState("");
+
+  const updateUtmParam = (
+    key: "source" | "medium" | "campaign" | "term" | "content",
+    val: string
+  ) => {
+    let s = utmSource;
+    let m = utmMedium;
+    let c = utmCampaign;
+    let t = utmTerm;
+    let cont = utmContent;
+
+    if (key === "source") { s = val; setUtmSource(val); }
+    if (key === "medium") { m = val; setUtmMedium(val); }
+    if (key === "campaign") {
+      c = val;
+      setUtmCampaign(val);
+      if (setCampaignInput) setCampaignInput(val);
+    }
+    if (key === "term") { t = val; setUtmTerm(val); }
+    if (key === "content") { cont = val; setUtmContent(val); }
+
+    if (!urlInput.trim()) return;
+    try {
+      const base = urlInput.split("?")[0];
+      const params = new URLSearchParams();
+      if (s) params.set("utm_source", s);
+      if (m) params.set("utm_medium", m);
+      if (c) params.set("utm_campaign", c);
+      if (t) params.set("utm_term", t);
+      if (cont) params.set("utm_content", cont);
+      const queryStr = params.toString();
+      setUrlInput(queryStr ? `${base}?${queryStr}` : base);
+    } catch {
+      // url may not be full yet
+    }
+  };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -81,7 +157,12 @@ export default function HomeTab({
         icon: <Globe className="w-4 h-4 text-amber-400" />,
         btnText: "Install",
         badgeBg: "bg-amber-500/15",
-        onClick: () => toast.info("PicoLink Chrome Extension is launching soon!"),
+        onClick: () => {
+          toast.info("Opening Chrome Web Store extension portal...", {
+            description: "Redirecting to Google Chrome Web Store",
+          });
+          window.open("https://chromewebstore.google.com/", "_blank", "noopener,noreferrer");
+        },
       },
       {
         name: "Canva",
@@ -89,7 +170,12 @@ export default function HomeTab({
         icon: <Palette className="w-4 h-4 text-teal-400" />,
         btnText: "Connect",
         badgeBg: "bg-teal-500/15",
-        onClick: () => toast.info("Canva Integration connected!"),
+        onClick: () => {
+          toast.success("Connecting to Canva...", {
+            description: "Redirecting to Canva apps and creative studio.",
+          });
+          window.open("https://www.canva.com/apps/", "_blank", "noopener,noreferrer");
+        },
       },
       {
         name: "Shopify",
@@ -98,7 +184,12 @@ export default function HomeTab({
         btnText: "Connect",
         badgeBg: "bg-emerald-500/15",
         isNew: true,
-        onClick: () => toast.info("Shopify Integration connected!"),
+        onClick: () => {
+          toast.success("Connecting to Shopify...", {
+            description: "Redirecting to Shopify App Store.",
+          });
+          window.open("https://apps.shopify.com/", "_blank", "noopener,noreferrer");
+        },
       },
     ],
     [
@@ -108,7 +199,12 @@ export default function HomeTab({
         icon: <Zap className="w-4 h-4 text-orange-400" />,
         btnText: "Connect",
         badgeBg: "bg-orange-500/15",
-        onClick: () => toast.info("Zapier Integration connected!"),
+        onClick: () => {
+          toast.success("Connecting to Zapier...", {
+            description: "Opening Zapier App Directory.",
+          });
+          window.open("https://zapier.com/apps", "_blank", "noopener,noreferrer");
+        },
       },
       {
         name: "Slack",
@@ -116,7 +212,12 @@ export default function HomeTab({
         icon: <Globe className="w-4 h-4 text-purple-400" />,
         btnText: "Connect",
         badgeBg: "bg-purple-500/15",
-        onClick: () => toast.info("Slack Bot connected!"),
+        onClick: () => {
+          toast.success("Connecting to Slack...", {
+            description: "Opening Slack App Directory.",
+          });
+          window.open("https://slack.com/apps", "_blank", "noopener,noreferrer");
+        },
       },
       {
         name: "WordPress",
@@ -124,7 +225,12 @@ export default function HomeTab({
         icon: <Globe className="w-4 h-4 text-blue-400" />,
         btnText: "Connect",
         badgeBg: "bg-blue-500/15",
-        onClick: () => toast.info("WordPress Plugin installed!"),
+        onClick: () => {
+          toast.info("Opening WordPress Plugin Directory...", {
+            description: "Redirecting to WordPress.org plugins.",
+          });
+          window.open("https://wordpress.org/plugins/", "_blank", "noopener,noreferrer");
+        },
       },
     ],
   ];
@@ -135,18 +241,18 @@ export default function HomeTab({
     <div className="max-w-4xl mx-auto space-y-7 py-3">
       {/* 1. Central Hero Section: "What do you want to create?" (Matching Screenshot 1) */}
       <div className="text-center space-y-4">
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
           What do you want to create?
         </h1>
 
         {/* Segmented Mode Switcher (Short link vs QR Code) */}
-        <div className="inline-flex p-1 rounded-xl bg-slate-900 border border-slate-800 shadow-inner">
+        <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-inner">
           <button
             onClick={() => setCreateMode("short")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition ${
               createMode === "short"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-indigo-600 !text-white shadow-md shadow-indigo-600/30"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
           >
             <LinkIcon className="w-3.5 h-3.5" />
@@ -159,8 +265,8 @@ export default function HomeTab({
             }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition ${
               createMode === "qr"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-indigo-600 !text-white shadow-md shadow-indigo-600/30"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
           >
             <QrCode className="w-3.5 h-3.5" />
@@ -168,10 +274,20 @@ export default function HomeTab({
           </button>
         </div>
 
+        {/* Read-Only / Viewer Mode Notice Banner */}
+        {isViewer && (
+          <div className="max-w-2xl mx-auto flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs text-left font-medium shadow-sm">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="flex-1">
+              <strong>View-only access:</strong> You have Viewer permissions in <strong>{activeWorkspace?.name || "this workspace"}</strong>. Creating short links is disabled.
+            </div>
+          </div>
+        )}
+
         {/* Main URL Shortener Input Box (Matching Screenshot 1) */}
         <form onSubmit={handleShorten} className="max-w-2xl mx-auto mt-2">
-          <div className="relative flex items-center bg-slate-900/90 border border-slate-800 rounded-2xl p-2 shadow-2xl focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition">
-            <div className="pl-3 pr-2 text-slate-500">
+          <div className="relative flex items-center bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-slate-800 rounded-2xl p-2 shadow-2xl focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition">
+            <div className="pl-3 pr-2 text-slate-400 dark:text-slate-500">
               <LinkIcon className="w-4 h-4" />
             </div>
             <input
@@ -180,16 +296,21 @@ export default function HomeTab({
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="Paste a long URL to shorten it..."
-              className="flex-1 bg-transparent py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none"
+              disabled={isViewer}
+              className="flex-1 bg-transparent py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={shortenLoading || !urlInput.trim()}
-              className="p-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs border border-slate-700 transition disabled:opacity-40 flex items-center gap-1.5"
-              title="Shorten URL"
+              disabled={shortenLoading || !urlInput.trim() || isViewer}
+              className={`p-2 sm:px-4 sm:py-2.5 rounded-xl font-semibold text-xs border transition flex items-center gap-1.5 ${
+                isViewer
+                  ? "bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700/50 cursor-not-allowed opacity-50"
+                  : "bg-indigo-600 hover:bg-indigo-500 !text-white border-transparent shadow-md shadow-indigo-600/20 disabled:opacity-40"
+              }`}
+              title={isViewer ? "View-only access in this workspace" : "Shorten URL"}
             >
               {shortenLoading ? (
-                <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
               ) : (
                 <ArrowRight className="w-4 h-4" />
               )}
@@ -225,37 +346,253 @@ export default function HomeTab({
             <Info className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
           </div>
 
-          {/* Collapsible Advanced vanity slug inputs */}
-          {showAdvanced && (
-            <div className="mt-3 p-4 rounded-xl bg-slate-900/60 border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-left animate-fade-in">
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                  Custom Slug (Vanity)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-slate-500 font-mono text-xs">/</span>
+          {/* Option Toggles */}
+          <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                setShowUtmBuilder(!showUtmBuilder);
+                if (showAdvanced) setShowAdvanced(false);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                showUtmBuilder
+                  ? "bg-indigo-600 !text-white border-indigo-500 shadow-md shadow-indigo-600/30"
+                  : "bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800"
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+              <span>UTM Campaign Builder</span>
+              {showUtmBuilder ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowAdvanced(!showAdvanced);
+                if (showUtmBuilder) setShowUtmBuilder(false);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                showAdvanced
+                  ? "bg-indigo-600 !text-white border-indigo-500 shadow-md shadow-indigo-600/30"
+                  : "bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800"
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+              <span>Security &amp; Deep Link Options</span>
+              {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          {/* Phase 1.2: UTM Campaign Builder Panel */}
+          {showUtmBuilder && (
+            <div className="mt-3 p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-indigo-500/30 space-y-4 text-left animate-fade-in shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                    UTM Campaign Parameters
+                  </h3>
+                </div>
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-500/20 font-medium">
+                  Auto-syncs to destination URL
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Campaign Source (<code className="text-indigo-600 dark:text-indigo-400 font-mono">utm_source</code>)
+                  </label>
                   <input
                     type="text"
-                    value={slugInput}
-                    onChange={(e) => setSlugInput(e.target.value)}
-                    placeholder="custom-vanity"
-                    className="w-full pl-7 pr-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    value={utmSource}
+                    onChange={(e) => updateUtmParam("source", e.target.value)}
+                    placeholder="e.g. google, newsletter, twitter"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Campaign Medium (<code className="text-indigo-600 dark:text-indigo-400 font-mono">utm_medium</code>)
+                  </label>
+                  <input
+                    type="text"
+                    value={utmMedium}
+                    onChange={(e) => updateUtmParam("medium", e.target.value)}
+                    placeholder="e.g. cpc, email, social"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Campaign Name (<code className="text-indigo-600 dark:text-indigo-400 font-mono">utm_campaign</code>)
+                  </label>
+                  <input
+                    type="text"
+                    value={utmCampaign}
+                    onChange={(e) => updateUtmParam("campaign", e.target.value)}
+                    placeholder="e.g. spring_launch_2026"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                  Expires in (Days)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={expiresInput}
-                  onChange={(e) => setExpiresInput(e.target.value)}
-                  placeholder="e.g. 30"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Campaign Term (<code className="text-indigo-600 dark:text-indigo-400 font-mono">utm_term</code>)
+                  </label>
+                  <input
+                    type="text"
+                    value={utmTerm}
+                    onChange={(e) => updateUtmParam("term", e.target.value)}
+                    placeholder="e.g. cloud+hosting"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Campaign Content (<code className="text-indigo-600 dark:text-indigo-400 font-mono">utm_content</code>)
+                  </label>
+                  <input
+                    type="text"
+                    value={utmContent}
+                    onChange={(e) => updateUtmParam("content", e.target.value)}
+                    placeholder="e.g. hero_cta_button"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Quick source presets */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <span>Quick source presets:</span>
+                {["google", "newsletter", "twitter", "linkedin", "facebook", "youtube"].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => updateUtmParam("source", preset)}
+                    className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition"
+                  >
+                    +{preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Phase 2 & 3: Collapsible Advanced Security & Deep Link options */}
+          {showAdvanced && (
+            <div className="mt-3 p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 space-y-4 text-left animate-fade-in shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                    Advanced Link Options
+                  </h3>
+                </div>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Enterprise Features</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Custom Slug */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Custom Slug (Vanity Alias)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 font-mono text-xs">/</span>
+                    <input
+                      type="text"
+                      value={slugInput}
+                      onChange={(e) => setSlugInput(e.target.value)}
+                      placeholder="custom-vanity"
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Expiry */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Expires in (Days)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={expiresInput}
+                    onChange={(e) => setExpiresInput(e.target.value)}
+                    placeholder="e.g. 30 (Leave empty for permanent)"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Password Protection & Burn-After-Read (Phase 2.1) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                    <span>Set Link Password (Optional)</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput && setPasswordInput(e.target.value)}
+                    placeholder="Visitors must enter password to unlock"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Flame className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                    <span>Expire After Clicks (Burn-After-Read)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={maxClicksInput}
+                    onChange={(e) => setMaxClicksInput && setMaxClicksInput(e.target.value)}
+                    placeholder="e.g. 1 for one-time secret, 10 for limit"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-rose-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Mobile Deep Linking (Phase 3.2) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Smartphone className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                    <span>iOS App Scheme (Deep Link)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={iosUrlInput}
+                    onChange={(e) => setIosUrlInput && setIosUrlInput(e.target.value)}
+                    placeholder="e.g. myapp://item/123"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Android App Scheme (Deep Link)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={androidUrlInput}
+                    onChange={(e) => setAndroidUrlInput && setAndroidUrlInput(e.target.value)}
+                    placeholder="e.g. intent://myapp#Intent;..."
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -294,15 +631,15 @@ export default function HomeTab({
       </div>
 
       {/* 2. Smart Workflow Banner (Matching Screenshot 1) */}
-      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-indigo-500/15 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-white">
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white">
               Simplify your workflow{" "}
-              <span className="text-slate-400 font-normal">
+              <span className="text-slate-500 dark:text-slate-400 font-normal">
                 Explore smarter ways to create links.
               </span>
             </h3>
@@ -311,19 +648,19 @@ export default function HomeTab({
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-[11px] text-slate-300 hover:text-white border border-slate-700/60 transition"
+            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-[11px] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/60 transition"
           >
             🔗 Personalize a short link
           </button>
           <button
             onClick={() => toast.info("UTM campaign builder ready!")}
-            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-[11px] text-slate-300 hover:text-white border border-slate-700/60 transition"
+            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-[11px] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/60 transition"
           >
             ⭐ Make a unique link for every post
           </button>
           <button
             onClick={onUpgradePro}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white text-[11px] font-semibold transition shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 !text-white text-[11px] font-semibold transition shadow-sm"
           >
             <Crown className="w-3 h-3 text-amber-200" />
             <span>Upgrade to Create with AI</span>
@@ -334,25 +671,32 @@ export default function HomeTab({
       {/* 3. Bottom Two-Column Section (Matching Screenshot 1) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Card: "Connect your account" (Ecosystem & Integrations) */}
-        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-4">
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4 shadow-sm">
           <div>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Connect your account</h3>
-              <span
-                onClick={() => toast.info("Exploring 50+ integrations...")}
-                className="text-xs text-indigo-400 hover:underline cursor-pointer"
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Connect your account</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateToIntegrations) {
+                    onNavigateToIntegrations();
+                  } else {
+                    toast.info("Explore PicoLink integrations in the Integrations tab.");
+                  }
+                }}
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline cursor-pointer transition font-medium"
               >
                 Explore Integrations &rarr;
-              </span>
+              </button>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">Recommended for you</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Recommended for you</p>
 
             {/* Integrations List */}
             <div className="mt-4 space-y-3">
               {currentIntegrations.map((item, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80"
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80 transition"
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -362,21 +706,22 @@ export default function HomeTab({
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-semibold text-white">{item.name}</h4>
+                        <h4 className="text-xs font-semibold text-slate-900 dark:text-white">{item.name}</h4>
                         {item.isNew && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-bold uppercase">
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 font-bold uppercase">
                             New
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-400">{item.desc}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">{item.desc}</p>
                     </div>
                   </div>
                   <button
                     onClick={item.onClick}
-                    className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 hover:text-slate-900 dark:text-white transition"
                   >
-                    {item.btnText}
+                    <span>{item.btnText}</span>
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
                   </button>
                 </div>
               ))}
@@ -388,7 +733,7 @@ export default function HomeTab({
             <button
               onClick={() => setIntegrationPage((p) => Math.max(0, p - 1))}
               disabled={integrationPage === 0}
-              className="text-slate-500 hover:text-white disabled:opacity-30 transition"
+              className="text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 transition"
               title="Previous"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -399,7 +744,7 @@ export default function HomeTab({
                   key={dot}
                   onClick={() => setIntegrationPage(dot)}
                   className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all ${
-                    integrationPage === dot ? "w-3 bg-indigo-500" : "bg-slate-700"
+                    integrationPage === dot ? "w-3 bg-indigo-500" : "bg-slate-300 dark:bg-slate-700"
                   }`}
                 />
               ))}
@@ -407,7 +752,7 @@ export default function HomeTab({
             <button
               onClick={() => setIntegrationPage((p) => Math.min(1, p + 1))}
               disabled={integrationPage === 1}
-              className="text-slate-500 hover:text-white disabled:opacity-30 transition"
+              className="text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 transition"
               title="Next"
             >
               <ChevronRight className="w-3.5 h-3.5" />
@@ -416,12 +761,12 @@ export default function HomeTab({
         </div>
 
         {/* Right Card: "Get started with PicoLink" (Onboarding & Milestones Checklist) */}
-        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-4">
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4 shadow-sm">
           <div>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Get started with PicoLink</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Get started with PicoLink</h3>
               {/* Circular Gauge / Percentage Indicator (Matching Screenshot 1) */}
-              <div className="flex items-center gap-1 text-xs font-bold text-indigo-400">
+              <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400">
                 <span>{userLinksCount > 0 ? "66%" : "33%"}</span>
                 <span className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin inline-block" />
               </div>
@@ -430,15 +775,15 @@ export default function HomeTab({
             {/* Checklist items matching Screenshot 1 */}
             <div className="mt-4 space-y-3">
               {/* Step 1: Link shortened (Checked) */}
-              <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                 </div>
                 <span className="text-xs font-medium text-slate-800 dark:text-slate-200">Link shortened</span>
               </div>
 
               {/* Step 2: Collect 10 clicks or scans (Active card with progress bar) */}
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 space-y-2.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-slate-900 dark:text-slate-200">Collect 10 clicks or scans</span>
                   <span className="text-slate-500 dark:text-slate-400 text-[11px]">
@@ -463,10 +808,10 @@ export default function HomeTab({
                         toast.info("Share your shortened links with your audience!");
                       }
                     }}
-                    className="btn-solid-primary flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition"
+                    className="btn-solid-primary flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 !text-white text-xs font-semibold shadow-sm transition"
                   >
-                    <Share2 className="w-3.5 h-3.5 text-white" />
-                    <span className="text-white font-semibold">Share first link</span>
+                    <Share2 className="w-3.5 h-3.5 !text-white" />
+                    <span className="!text-white font-semibold">Share first link</span>
                   </button>
                   <button
                     onClick={onNavigateToLinks}
@@ -479,7 +824,7 @@ export default function HomeTab({
               </div>
 
               {/* Step 3: Preview Analytics unlock */}
-              <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+              <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80">
                 <div className="w-5 h-5 rounded-full border border-slate-300 dark:border-slate-700 flex items-center justify-center shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-600" />
                 </div>
