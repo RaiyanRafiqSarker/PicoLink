@@ -158,11 +158,11 @@ export default function PagesProductPage() {
           </Link>
 
           {/* Center Navigation Links: Platform, Pricing, About Us */}
-          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-300">
+          <nav className="hidden md:flex items-center gap-7 text-base font-semibold text-slate-300">
             {/* 1. Platform (with mega-menu dropdown) */}
             <div className="relative group cursor-pointer flex items-center gap-1.5 hover:text-white transition py-2">
               <span className="text-orange-400 font-bold">Platform</span>
-              <ChevronDown className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition transform group-hover:rotate-180 duration-200" />
+              <ChevronDown className="w-4 h-4 opacity-70 group-hover:opacity-100 transition transform group-hover:rotate-180 duration-200" />
 
               {/* Mega-Menu Dropdown */}
               <div className="absolute top-full -left-4 sm:left-0 mt-2 w-[720px] max-w-[94vw] rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl shadow-black/30 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto text-left">

@@ -1070,11 +1070,16 @@ export default function PagesTab({
         <div className="lg:col-span-5 flex flex-col items-center">
           <div className="sticky top-6 w-full max-w-[340px]">
             {/* Phone Shell with realistic bezel, speaker notch & shadow */}
-            <div className="phone-mockup-frame relative mx-auto w-full rounded-[42px] p-3 bg-slate-950 shadow-2xl ring-1 ring-slate-800 border-4 border-slate-900 transition-colors">
+            <div className="phone-mockup-frame relative mx-auto w-full rounded-[46px] p-3.5 bg-black dark:bg-black shadow-[0_25px_70px_rgba(0,0,0,0.95)] ring-1 ring-white/15 border-4 border-slate-700/80 dark:border-zinc-700 transition-all select-none">
+              {/* Hardware Side Buttons (Volume Up/Down & Power/Lock) */}
+              <div className="absolute -left-[6px] top-24 w-[3.5px] h-9 bg-slate-600 dark:bg-zinc-600 rounded-l-sm pointer-events-none" />
+              <div className="absolute -left-[6px] top-36 w-[3.5px] h-9 bg-slate-600 dark:bg-zinc-600 rounded-l-sm pointer-events-none" />
+              <div className="absolute -right-[6px] top-28 w-[3.5px] h-12 bg-slate-600 dark:bg-zinc-600 rounded-r-sm pointer-events-none" />
+
               {/* Dynamic Island / Camera Notch */}
-              <div className="dynamic-island absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-black rounded-full z-30 flex items-center justify-center">
-                <div className="w-2.5 h-2.5 rounded-full bg-slate-900/80 mr-2" />
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-950" />
+              <div className="dynamic-island absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-black rounded-full z-30 flex items-center justify-center ring-1 ring-white/15 shadow-sm">
+                <div className="w-2.5 h-2.5 rounded-full bg-slate-900/90 mr-2 ring-1 ring-white/5" />
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-950 ring-1 ring-white/10" />
               </div>
 
               {/* Status Bar */}
@@ -1090,7 +1095,7 @@ export default function PagesTab({
 
               {/* Phone Screen Canvas */}
               <div
-                className={`phone-screen w-full min-h-[560px] max-h-[600px] overflow-y-auto rounded-[34px] p-5 pt-8 bg-gradient-to-b ${currentTheme.bgStyle} flex flex-col justify-between scrollbar-none transition-all duration-300`}
+                className={`phone-screen w-full min-h-[560px] max-h-[600px] overflow-y-auto rounded-[34px] p-5 pt-8 bg-gradient-to-b ${currentTheme.bgStyle} flex flex-col justify-between scrollbar-none transition-all duration-300 ring-1 ring-white/10 shadow-inner`}
               >
                 {/* Profile Header */}
                 <div className="text-center space-y-3">

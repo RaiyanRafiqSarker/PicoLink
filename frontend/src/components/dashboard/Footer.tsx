@@ -10,7 +10,7 @@ export default function Footer() {
     >
       <div
         suppressHydrationWarning
-        className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs"
+        className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-sm"
       >
         <div className="flex items-center gap-2">
           <span className="font-bold tracking-tight text-slate-900 dark:text-white">
@@ -29,7 +29,7 @@ export default function Footer() {
             </a>
           </span>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
           <span className="font-mono tracking-tight">Enterprise URL Shortener</span>
         </div>

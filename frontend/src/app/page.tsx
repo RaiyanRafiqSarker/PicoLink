@@ -1296,11 +1296,11 @@ export default function Home() {
           </div>
 
           {/* Center Navigation Links: Platform, Pricing, About Us */}
-          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-600 dark:text-slate-300">
+          <nav className="hidden md:flex items-center gap-7 text-base font-semibold text-slate-600 dark:text-slate-300">
             {/* 1. Platform (with dropdown) */}
             <div className="relative group cursor-pointer flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition py-2">
               <span>Platform</span>
-              <ChevronDown className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition transform group-hover:rotate-180 duration-200" />
+              <ChevronDown className="w-4 h-4 opacity-60 group-hover:opacity-100 transition transform group-hover:rotate-180 duration-200" />
 
               {/* Mega-Menu Dropdown */}
               <div className="absolute top-full -left-4 sm:left-0 mt-2 w-[720px] max-w-[94vw] rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl shadow-black/25 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto">
@@ -2899,8 +2899,8 @@ export default function Home() {
       {/* ========================================================= */}
       {/* 6. FREE PLAN VALUE BANNER (MATCHING USER REFERENCE IMAGE) */}
       {/* ========================================================= */}
-      <div className="w-full bg-[#07132b] dark:bg-[#07132b] border-t border-slate-800/80 dark:border-slate-800/80 py-3.5 px-4 sm:px-8 z-20 transition-colors free-plan-banner">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-center gap-3 md:gap-7 text-xs sm:text-sm">
+      <div className="w-full bg-[#07132b] dark:bg-[#07132b] border-t border-slate-800/80 dark:border-slate-800/80 py-4 px-4 sm:px-8 z-20 transition-colors free-plan-banner">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-center gap-3 md:gap-7 text-sm sm:text-base">
           <div className="font-bold text-white dark:text-white free-plan-banner-title text-center md:text-left">
             <button
               type="button"
@@ -2908,7 +2908,7 @@ export default function Home() {
                 setAuthModalTab("signup");
                 setAuthModalOpen(true);
               }}
-              className="underline hover:text-orange-400 dark:hover:text-orange-400 cursor-pointer transition"
+              className="underline hover:text-orange-400 dark:hover:text-orange-400 cursor-pointer transition font-semibold"
             >
               Sign up for free.
             </button>{" "}
@@ -2916,14 +2916,14 @@ export default function Home() {
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
             <div className="flex items-center gap-2 text-slate-200 dark:text-slate-200 free-plan-banner-item">
-              <svg className="w-4 h-4 text-orange-500 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="w-5 h-5 text-orange-500 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="10" cy="10" r="8" />
                 <path d="M6 10l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span className="font-medium">10 short links/month</span>
             </div>
             <div className="flex items-center gap-2 text-slate-200 dark:text-slate-200 free-plan-banner-item">
-              <svg className="w-4 h-4 text-orange-500 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="w-5 h-5 text-orange-500 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="10" cy="10" r="8" />
                 <path d="M6 10l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>

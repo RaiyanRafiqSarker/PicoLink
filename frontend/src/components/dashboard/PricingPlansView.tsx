@@ -504,7 +504,7 @@ export default function PricingPlansView({
             <div className="space-y-4">
               <div>
                 <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Core</h3>
-                <p className="pricing-card-desc text-xs text-slate-500 dark:text-slate-400 mt-1 min-h-[32px]">
+                <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
                   For individuals and creators who need custom links and essential QR codes.
                 </p>
               </div>
@@ -514,22 +514,22 @@ export default function PricingPlansView({
                   <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
                     ${billingCycle === "annual" ? "8" : "10"}
                   </span>
-                  <span className="text-xs font-medium text-slate-500">/month</span>
+                  <span className="text-sm font-medium text-slate-500">/month</span>
                 </div>
-                <p className="pricing-card-period text-[11px] text-slate-400 mt-0.5">
+                <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
                   {billingCycle === "annual" ? "Billed annually ($96/yr)" : "Billed monthly"}
                 </p>
               </div>
 
               <button
                 onClick={() => handlePlanSelect("Core")}
-                className="w-full py-2.5 px-4 rounded-xl border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-xs transition shadow-sm"
+                className="w-full py-2.5 px-4 rounded-xl border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-sm transition shadow-sm"
               >
                 Get Started
               </button>
 
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-xs text-slate-900 dark:text-slate-200">
-                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider text-[11px]">
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
                   Core includes:
                 </p>
                 <div className="flex items-start gap-2">
@@ -569,7 +569,7 @@ export default function PricingPlansView({
                 <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white flex items-center justify-between">
                   <span>Growth</span>
                 </h3>
-                <p className="pricing-card-desc text-xs text-slate-500 dark:text-slate-400 mt-1 min-h-[32px]">
+                <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
                   For small businesses and growing teams looking to engage audiences.
                 </p>
               </div>
@@ -579,22 +579,22 @@ export default function PricingPlansView({
                   <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
                     ${billingCycle === "annual" ? "24" : "29"}
                   </span>
-                  <span className="text-xs font-medium text-slate-500">/month</span>
+                  <span className="text-sm font-medium text-slate-500">/month</span>
                 </div>
-                <p className="pricing-card-period text-[11px] text-slate-400 mt-0.5">
+                <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
                   {billingCycle === "annual" ? "Billed annually ($288/yr)" : "Billed monthly"}
                 </p>
               </div>
 
               <button
                 onClick={() => handlePlanSelect("Growth")}
-                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition shadow-lg shadow-blue-600/30 transform hover:-translate-y-0.5"
+                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition shadow-lg shadow-blue-600/30 transform hover:-translate-y-0.5"
               >
                 Get Started
               </button>
 
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-xs text-slate-900 dark:text-slate-200">
-                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider text-[11px]">
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
                   Everything in Core, plus:
                 </p>
                 <div className="flex items-start gap-2">
@@ -630,7 +630,7 @@ export default function PricingPlansView({
             <div className="space-y-4">
               <div>
                 <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Premium</h3>
-                <p className="pricing-card-desc text-xs text-slate-500 dark:text-slate-400 mt-1 min-h-[32px]">
+                <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
                   For scaling brands and marketing agencies needing campaign-level tracking.
                 </p>
               </div>
@@ -640,22 +640,22 @@ export default function PricingPlansView({
                   <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
                     ${billingCycle === "annual" ? "149" : "199"}
                   </span>
-                  <span className="text-xs font-medium text-slate-500">/month</span>
+                  <span className="text-sm font-medium text-slate-500">/month</span>
                 </div>
-                <p className="pricing-card-period text-[11px] text-slate-400 mt-0.5">
+                <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
                   {billingCycle === "annual" ? "Billed annually ($1,788/yr)" : "Billed monthly"}
                 </p>
               </div>
 
               <button
                 onClick={() => handlePlanSelect("Premium")}
-                className="w-full py-2.5 px-4 rounded-xl border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-xs transition shadow-sm"
+                className="w-full py-2.5 px-4 rounded-xl border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-sm transition shadow-sm"
               >
                 Get Started
               </button>
 
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-xs text-slate-900 dark:text-slate-200">
-                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider text-[11px]">
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
                   Everything in Growth, plus:
                 </p>
                 <div className="flex items-start gap-2">
@@ -691,7 +691,7 @@ export default function PricingPlansView({
             <div className="space-y-4">
               <div>
                 <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Enterprise</h3>
-                <p className="pricing-card-desc text-xs text-slate-500 dark:text-slate-400 mt-1 min-h-[32px]">
+                <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
                   For large organizations requiring custom scale, security, and dedicated support.
                 </p>
               </div>
@@ -702,20 +702,20 @@ export default function PricingPlansView({
                     Custom
                   </span>
                 </div>
-                <p className="pricing-card-period text-[11px] text-slate-400 mt-0.5">
+                <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
                   Tailored volume &amp; multi-year agreement
                 </p>
               </div>
 
               <button
                 onClick={() => handlePlanSelect("Enterprise")}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-bold text-xs transition shadow-sm"
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-bold text-sm transition shadow-sm"
               >
                 Contact Sales
               </button>
 
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-xs text-slate-900 dark:text-slate-200">
-                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider text-[11px]">
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
                   Enterprise highlights:
                 </p>
                 <div className="flex items-start gap-2">

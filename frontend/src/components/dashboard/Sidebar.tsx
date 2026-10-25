@@ -96,7 +96,7 @@ export default function Sidebar({
                 <span className="brand-title text-xl font-extrabold tracking-tight block leading-tight">
                   PicoLink
                 </span>
-                <p className="header-tagline text-[10px] font-medium tracking-tight mt-0.5 leading-tight whitespace-nowrap">
+                <p className="header-tagline text-xs font-medium tracking-tight mt-0.5 leading-tight whitespace-nowrap">
                   Make Long Links Simple &amp; Trackable
                 </p>
               </div>
@@ -126,7 +126,7 @@ export default function Sidebar({
         <div className="p-3">
           <button
             onClick={onCreateNewClick}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm tracking-wide transition shadow-lg ${
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-base tracking-wide transition shadow-lg ${
               collapsed
                 ? "px-0 bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30"
                 : "px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-600/30 transform hover:-translate-y-0.5"
@@ -146,7 +146,7 @@ export default function Sidebar({
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition ${
+                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-base font-semibold transition ${
                   collapsed ? "justify-center" : "justify-start"
                 } ${
                   isActive
@@ -177,7 +177,7 @@ export default function Sidebar({
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition ${
+              className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-base font-semibold transition ${
                 collapsed ? "justify-center" : "justify-start"
               } ${
                 isActive

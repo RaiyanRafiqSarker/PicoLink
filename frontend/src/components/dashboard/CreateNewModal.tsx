@@ -236,19 +236,19 @@ export default function CreateNewModal({
             {viewMode === "shorten" && (
               <button
                 onClick={() => setViewMode("menu")}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition mr-1"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition mr-1"
                 title="Back to options"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
             )}
-            <h2 className="text-xl font-bold text-white tracking-tight">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
               {viewMode === "menu" ? "What do you want to create?" : "Create a Short Link"}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
             title="Close modal (Esc)"
           >
             <X className="w-5 h-5" />
@@ -261,16 +261,16 @@ export default function CreateNewModal({
             {/* Option 1: Shorten a link */}
             <button
               onClick={() => setViewMode("shorten")}
-              className="create-modal-tile group relative flex flex-col justify-between p-4.5 min-h-[115px] rounded-2xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-500/50 transition-all duration-200 text-left hover:shadow-lg hover:shadow-indigo-500/10"
+              className="create-modal-tile tile-link group relative flex flex-col justify-between p-4.5 min-h-[115px] rounded-2xl bg-white dark:bg-slate-950/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500/50 transition-all duration-200 text-left hover:shadow-md hover:shadow-indigo-500/10 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
                 <LinkIcon className="w-4 h-4" />
               </div>
               <div className="flex items-end justify-between w-full mt-3">
-                <span className="text-xs font-semibold text-slate-200 group-hover:text-white">
+                <span className="tile-title text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-white transition-colors">
                   Shorten a link
                 </span>
-                <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 border border-slate-700 text-slate-400 group-hover:text-indigo-300">
+                <kbd className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 group-hover:border-indigo-300 shadow-xs transition-colors">
                   L
                 </kbd>
               </div>
@@ -282,16 +282,16 @@ export default function CreateNewModal({
                 onSelectOption("qrcodes");
                 onClose();
               }}
-              className="create-modal-tile group relative flex flex-col justify-between p-4.5 min-h-[115px] rounded-2xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-500/50 transition-all duration-200 text-left hover:shadow-lg hover:shadow-amber-500/10"
+              className="create-modal-tile tile-qr group relative flex flex-col justify-between p-4.5 min-h-[115px] rounded-2xl bg-white dark:bg-slate-950/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500/50 transition-all duration-200 text-left hover:shadow-md hover:shadow-amber-500/10 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
                 <QrCode className="w-4 h-4" />
               </div>
               <div className="flex items-end justify-between w-full mt-3">
-                <span className="text-xs font-semibold text-slate-200 group-hover:text-white">
+                <span className="tile-title text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-amber-600 dark:group-hover:text-white transition-colors">
                   Create a QR Code
                 </span>
-                <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 border border-slate-700 text-slate-400 group-hover:text-amber-300">
+                <kbd className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 group-hover:border-amber-300 shadow-xs transition-colors">
                   Q
                 </kbd>
               </div>
@@ -303,16 +303,16 @@ export default function CreateNewModal({
                 onSelectOption("pages");
                 onClose();
               }}
-              className="create-modal-tile group relative flex flex-col justify-between p-4.5 min-h-[115px] rounded-2xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-purple-500/50 transition-all duration-200 text-left hover:shadow-lg hover:shadow-purple-500/10"
+              className="create-modal-tile tile-page group relative flex flex-col justify-between p-4.5 min-h-[115px] rounded-2xl bg-white dark:bg-slate-950/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-purple-400 dark:hover:border-purple-500/50 transition-all duration-200 text-left hover:shadow-md hover:shadow-purple-500/10 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+              <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-500/15 border border-purple-200 dark:border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform">
                 <FileText className="w-4 h-4" />
               </div>
               <div className="flex items-end justify-between w-full mt-3">
-                <span className="text-xs font-semibold text-slate-200 group-hover:text-white">
+                <span className="tile-title text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-purple-600 dark:group-hover:text-white transition-colors">
                   Build a page
                 </span>
-                <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 border border-slate-700 text-slate-400 group-hover:text-purple-300">
+                <kbd className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-400 group-hover:text-purple-600 dark:group-hover:text-purple-300 group-hover:border-purple-300 shadow-xs transition-colors">
                   P
                 </kbd>
               </div>
@@ -324,16 +324,16 @@ export default function CreateNewModal({
                 onSelectOption("links");
                 onClose();
               }}
-              className="create-modal-tile group relative flex flex-col justify-between p-4.5 min-h-[115px] rounded-2xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/50 transition-all duration-200 text-left hover:shadow-lg hover:shadow-emerald-500/10"
+              className="create-modal-tile tile-csv group relative flex flex-col justify-between p-4.5 min-h-[115px] rounded-2xl bg-white dark:bg-slate-950/60 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-500/50 transition-all duration-200 text-left hover:shadow-md hover:shadow-emerald-500/10 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
                 <Upload className="w-4 h-4" />
               </div>
               <div className="flex items-end justify-between w-full mt-3">
-                <span className="text-xs font-semibold text-slate-200 group-hover:text-white">
+                <span className="tile-title text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-white transition-colors">
                   Bulk CSV
                 </span>
-                <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 border border-slate-700 text-slate-400 group-hover:text-emerald-300">
+                <kbd className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:border-emerald-300 shadow-xs transition-colors">
                   B
                 </kbd>
               </div>
@@ -353,8 +353,8 @@ export default function CreateNewModal({
             {!createdResult ? (
               <form onSubmit={handleCreateLink} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                    Destination URL <span className="text-indigo-400">*</span>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                    Destination URL <span className="text-indigo-600 dark:text-indigo-400">*</span>
                   </label>
                   <input
                     type="url"
@@ -363,17 +363,17 @@ export default function CreateNewModal({
                     value={destinationUrl}
                     onChange={(e) => setDestinationUrl(e.target.value)}
                     placeholder="https://example.com/my-long-url-destination"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                       Custom Alias (Optional)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-xs font-mono text-slate-500">
+                      <span className="absolute left-3 top-2 text-xs font-mono text-slate-400">
                         /
                       </span>
                       <input
@@ -381,13 +381,13 @@ export default function CreateNewModal({
                         value={customSlug}
                         onChange={(e) => setCustomSlug(e.target.value)}
                         placeholder="vanity-slug"
-                        className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        className="w-full pl-7 pr-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                       Expires in Days (Optional)
                     </label>
                     <input
@@ -397,7 +397,7 @@ export default function CreateNewModal({
                       value={expiresInDays}
                       onChange={(e) => setExpiresInDays(e.target.value)}
                       placeholder="e.g. 30"
-                      className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
                     />
                   </div>
                 </div>
@@ -412,11 +412,11 @@ export default function CreateNewModal({
                     }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                       showUtm
-                        ? "bg-indigo-600 text-white border-indigo-500"
-                        : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800"
                     }`}
                   >
-                    <Target className="w-3.5 h-3.5 text-indigo-400" />
+                    <Target className={`w-3.5 h-3.5 ${showUtm ? "text-white" : "text-indigo-600 dark:text-indigo-400"}`} />
                     <span>UTM Parameters</span>
                     {showUtm ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>
@@ -429,11 +429,11 @@ export default function CreateNewModal({
                     }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                       showAdvanced
-                        ? "bg-indigo-600 text-white border-indigo-500"
-                        : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800"
                     }`}
                   >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+                    <SlidersHorizontal className={`w-3.5 h-3.5 ${showAdvanced ? "text-white" : "text-indigo-600 dark:text-indigo-400"}`} />
                     <span>Password &amp; Limits</span>
                     {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>

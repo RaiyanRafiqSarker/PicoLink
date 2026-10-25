@@ -74,19 +74,19 @@ export default function AssistDrawer({
           <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center !text-white shadow-xl shadow-indigo-500/30 mb-3">
             <Bot className="w-7 h-7 !text-white" />
           </div>
-          <h3 className="font-bold text-base text-slate-900 dark:text-white">
+          <h3 className="font-bold text-lg text-slate-900 dark:text-white">
             {isPro ? "PicoLink Assist Active" : "Upgrade for PicoLink Assist"}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
             Bring AI into your workflow with PicoLink Assist — from creating intelligent links to uncovering meaningful performance trends.
           </p>
 
           {!isPro && (
             <button
               onClick={onUpgradePro}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 !text-white text-xs font-semibold shadow-md shadow-teal-500/20 transition transform hover:-translate-y-0.5"
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 !text-white text-sm font-semibold shadow-md shadow-teal-500/20 transition transform hover:-translate-y-0.5"
             >
-              <Crown className="w-3.5 h-3.5 text-amber-200" />
+              <Crown className="w-4 h-4 text-amber-200" />
               <span>View plans</span>
             </button>
           )}
@@ -94,10 +94,10 @@ export default function AssistDrawer({
 
         {/* Feature Checklist */}
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             With PicoLink Assist, you can:
           </p>
-          <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
+          <ul className="space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
             {[
               "Get instant analytics and performance insights",
               "Create and optimize links with AI assistance",

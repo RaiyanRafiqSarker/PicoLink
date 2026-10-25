@@ -15,6 +15,27 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.45rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.65rem;
+  --text-lg: 1.2rem;
+  --text-lg--line-height: 1.8rem;
+  --text-xl: 1.35rem;
+  --text-xl--line-height: 1.9rem;
+  --text-2xl: 1.65rem;
+  --text-2xl--line-height: 2.15rem;
+  --text-3xl: 2.15rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-4xl: 2.65rem;
+  --text-4xl--line-height: 2.85rem;
+  --text-5xl: 3.35rem;
+  --text-5xl--line-height: 1.1;
+}
+
 html.dark {
   color-scheme: dark;
 }
@@ -607,39 +628,127 @@ html.light .pricing-plans-page .pricing-card-feature strong {
 html.light .create-modal-card {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  color: #0f172a !important;
 }
 
+html.light .create-modal-card h2 {
+  color: #0f172a !important;
+}
+
+/* Base Tile Styling in Light Mode */
 html.light .create-modal-tile {
-  background-color: #f8fafc !important;
+  background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
 }
 
 html.light .create-modal-tile:hover {
-  background-color: #f1f5f9 !important;
-  border-color: #818cf8 !important;
+  background-color: #f8fafc !important;
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.06), 0 4px 6px -2px rgba(0, 0, 0, 0.03) !important;
 }
 
+/* Individual Tile Hover States & Borders */
+html.light .create-modal-tile.tile-link:hover {
+  border-color: #818cf8 !important;
+}
+html.light .create-modal-tile.tile-qr:hover {
+  border-color: #f59e0b !important;
+}
+html.light .create-modal-tile.tile-page:hover {
+  border-color: #a855f7 !important;
+}
+html.light .create-modal-tile.tile-csv:hover {
+  border-color: #10b981 !important;
+}
+
+/* Tile Title Text Contrast in Light Mode */
+html.light .create-modal-tile .tile-title {
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+html.light .create-modal-tile.tile-link:hover .tile-title {
+  color: #4338ca !important;
+}
+html.light .create-modal-tile.tile-qr:hover .tile-title {
+  color: #b45309 !important;
+}
+html.light .create-modal-tile.tile-page:hover .tile-title {
+  color: #6b21a8 !important;
+}
+html.light .create-modal-tile.tile-csv:hover .tile-title {
+  color: #047857 !important;
+}
+
+/* Keyboard Shortcut Badges (L, Q, P, B) */
 html.light .create-modal-tile kbd {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+}
+html.light .create-modal-tile:hover kbd {
   background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+/* Modal Inputs & Sub-panels in Light Mode */
+html.light .create-modal-card input {
+  background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
-  color: #475569 !important;
+  color: #0f172a !important;
+}
+html.light .create-modal-card input::placeholder {
+  color: #94a3b8 !important;
+}
+html.light .create-modal-card label {
+  color: #334155 !important;
 }
 
 /* ========================================================================= */
 /* SMARTPHONE BIO-PAGE MOCKUP & BIO PAGES - LIGHT MODE CONTRAST & INTEGRITY */
 /* ========================================================================= */
 
-.phone-mockup-frame,
+.phone-mockup-frame {
+  background-color: #000000 !important;
+  border: 5px solid #475569 !important;
+  border-radius: 46px !important;
+  box-shadow: 
+    0 25px 65px -10px rgba(0, 0, 0, 0.95),
+    0 0 0 1px rgba(255, 255, 255, 0.15),
+    inset 0 1px 2px rgba(255, 255, 255, 0.25),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.8),
+    0 0 45px -8px rgba(99, 102, 241, 0.18) !important;
+}
+
+html.dark .phone-mockup-frame {
+  background-color: #000000 !important;
+  border: 5px solid #475569 !important;
+  border-radius: 46px !important;
+  box-shadow: 
+    0 25px 70px -8px rgba(0, 0, 0, 0.98),
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 1px 2px rgba(255, 255, 255, 0.28),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.8),
+    0 0 50px -10px rgba(99, 102, 241, 0.22) !important;
+}
+
 html.light .phone-mockup-frame {
-  background-color: #030712 !important;
-  border-color: #0f172a !important;
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  background-color: #000000 !important;
+  border: 5px solid #1e293b !important;
+  border-radius: 46px !important;
+  box-shadow: 
+    0 30px 70px -15px rgba(15, 23, 42, 0.35),
+    0 0 0 1px rgba(0, 0, 0, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.2) !important;
 }
 
 .phone-mockup-frame .dynamic-island,
 html.light .phone-mockup-frame .dynamic-island {
   background-color: #000000 !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.18) !important;
 }
 
 .phone-mockup-frame .status-bar,
