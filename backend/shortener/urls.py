@@ -1,4 +1,5 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import (
     ShortenView,
@@ -38,7 +39,11 @@ from .views import (
     AdminURLListView,
     AdminURLToggleView,
     AdminURLDeleteView,
+    PlanViewSet,
 )
+
+router = DefaultRouter()
+router.register(r"v1/plans", PlanViewSet, basename="plans")
 
 urlpatterns = [
     # Shorten & Verification (Phase 1 & Phase 2)
@@ -101,4 +106,9 @@ urlpatterns = [
     path("v1/admin/urls", AdminURLListView.as_view(), name="admin-urls-list"),
     path("v1/admin/urls/<int:pk>/toggle", AdminURLToggleView.as_view(), name="admin-urls-toggle"),
     path("v1/admin/urls/<int:pk>", AdminURLDeleteView.as_view(), name="admin-urls-delete"),
+
+    # Phase 6: Dynamic Subscription Plans
+    path("v1/plans", PlanViewSet.as_view({"get": "list"}), name="plans-list-noslash"),
+    path("", include(router.urls)),
 ]
+

@@ -85,18 +85,21 @@ export default function Sidebar({
         <div
           className={`relative flex items-center ${
             collapsed ? "justify-center" : "justify-between"
-          } px-3.5 py-4 border-b border-slate-200 dark:border-slate-800/80`}
+          } px-3.5 py-4 border-b border-slate-200 dark:border-slate-800/80 overflow-hidden`}
         >
-          <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2.5 min-w-0 flex-1"}`}>
+          <div className={`relative flex items-center ${collapsed ? "justify-center" : "gap-2.5 min-w-0 flex-1 overflow-hidden"}`}>
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/10 shrink-0">
               <Zap className="w-5 h-5 text-white" />
             </div>
             {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <span className="brand-title text-xl font-extrabold tracking-tight block leading-tight">
+              <div className="relative min-w-0 flex-1 flex flex-col justify-center overflow-hidden">
+                <span className="brand-title text-xl font-extrabold tracking-tight block leading-tight truncate">
                   PicoLink
                 </span>
-                <p className="header-tagline text-xs font-medium tracking-tight mt-0.5 leading-tight whitespace-nowrap">
+                <p
+                  className="header-tagline text-[11px] font-medium tracking-tight mt-0.5 leading-tight truncate whitespace-nowrap"
+                  title="Make Long Links Simple & Trackable"
+                >
                   Make Long Links Simple &amp; Trackable
                 </p>
               </div>

@@ -163,6 +163,14 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     subscription_tier = models.CharField(max_length=20, choices=TIER_CHOICES, default=TIER_FREE)
+    plan = models.ForeignKey(
+        "Plan",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="subscribers",
+        help_text="Active dynamic subscription plan"
+    )
     is_subscribed = models.BooleanField(default=False)
     stripe_customer_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
     stripe_subscription_id = models.CharField(max_length=255, null=True, blank=True)
@@ -177,11 +185,16 @@ class UserProfile(models.Model):
         verbose_name_plural = "User Profiles"
 
     def __str__(self):
-        return f"{self.user.username} [{self.subscription_tier}]"
+        tier_name = self.plan.name if self.plan else self.subscription_tier
+        return f"{self.user.username} [{tier_name}]"
 
     @property
     def is_pro(self) -> bool:
-        return self.is_subscribed or self.subscription_tier in (self.TIER_PRO, self.TIER_ENTERPRISE) or self.user.is_superuser
+        if self.user.is_superuser:
+            return True
+        if self.plan:
+            return self.plan.slug in ("growth", "pro", "premium", "enterprise") or self.plan.price_monthly > 0
+        return self.is_subscribed or self.subscription_tier in (self.TIER_PRO, self.TIER_ENTERPRISE)
 
 
 class DailyQuotaRecord(models.Model):
@@ -313,6 +326,58 @@ class ClickWebhook(models.Model):
 
     def __str__(self):
         return f"{self.user.username} -> {self.target_url} ({'Active' if self.is_active else 'Disabled'})"
+
+
+# ==========================================
+# Phase 6: Dynamic Subscription Plans & Features
+# ==========================================
+class Plan(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100, unique=True, db_index=True)
+    tagline = models.CharField(max_length=255, blank=True, default="")
+    price_monthly = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    price_annual = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    stripe_price_id_monthly = models.CharField(max_length=100, blank=True, default="")
+    stripe_price_id_annual = models.CharField(max_length=100, blank=True, default="")
+
+    # Resource quotas
+    links_limit = models.IntegerField(default=100, help_text="Monthly short links limit (-1 for unlimited)")
+    custom_domains_limit = models.IntegerField(default=0, help_text="Number of custom domains included")
+    qr_codes_limit = models.IntegerField(default=5, help_text="Dynamic QR codes limit")
+    bio_pages_limit = models.IntegerField(default=1, help_text="Link-in-bio pages limit")
+
+    is_popular = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "plans"
+        ordering = ["display_order", "id"]
+        verbose_name = "Subscription Plan"
+        verbose_name_plural = "Subscription Plans"
+
+    def __str__(self):
+        return f"{self.name} (${self.price_monthly}/mo)"
+
+
+class PlanFeature(models.Model):
+    plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name="features")
+    text = models.CharField(max_length=255)
+    is_included = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "plan_features"
+        ordering = ["display_order", "id"]
+        verbose_name = "Plan Feature"
+        verbose_name_plural = "Plan Features"
+
+    def __str__(self):
+        return f"{self.plan.name} - {self.text}"
 
 
 from django.db.models.signals import post_save

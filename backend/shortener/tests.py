@@ -328,3 +328,98 @@ class BotFilteringTestCase(TestCase):
         self.assertEqual(sum(d["count"] for d in stats["clicks_last_7_days"]), 1)
         self.assertEqual(stats["device_breakdown"], [{"name": "Mobile", "count": 1, "percentage": 100.0}])
         self.assertEqual(len(stats["recent_clicks"]), 1)
+
+
+class PlanAndPricingAPITestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_list_plans_endpoint(self):
+        resp = self.client.get("/api/v1/plans/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertGreaterEqual(len(data), 4)
+
+        slugs = [p["slug"] for p in data]
+        self.assertIn("core", slugs)
+        self.assertIn("growth", slugs)
+        self.assertIn("premium", slugs)
+        self.assertIn("enterprise", slugs)
+
+        growth_plan = next(p for p in data if p["slug"] == "growth")
+        self.assertTrue(growth_plan["is_popular"])
+        self.assertEqual(float(growth_plan["price_monthly"]), 24.0)
+        self.assertGreaterEqual(len(growth_plan["features"]), 5)
+
+    def test_retrieve_single_plan_by_slug(self):
+        resp = self.client.get("/api/v1/plans/core/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["name"], "Core")
+        self.assertEqual(float(data["price_monthly"]), 8.0)
+        self.assertIn("features", data)
+        self.assertTrue(any("100 short links" in f["text"] for f in data["features"]))
+
+    def test_inactive_plan_hidden(self):
+        from shortener.models import Plan
+        inactive = Plan.objects.create(
+            name="Secret Legacy",
+            slug="legacy-secret",
+            price_monthly=999,
+            price_annual=9999,
+            is_active=False,
+            display_order=99,
+        )
+        resp = self.client.get("/api/v1/plans/")
+        slugs = [p["slug"] for p in resp.json()]
+        self.assertNotIn("legacy-secret", slugs)
+
+    def test_dynamic_plan_quota_and_user_profile(self):
+        from shortener.models import Plan, UserProfile
+        from shortener.services.quota import QuotaService
+
+        user = User.objects.create_user(username="growthuser", password="password123")
+        growth_plan = Plan.objects.get(slug="growth")
+
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile.plan = growth_plan
+        profile.save()
+
+        tier, limit = QuotaService.get_user_tier_and_limit(user)
+        self.assertEqual(tier, "growth")
+        self.assertEqual(limit, 500)
+
+        # Check me endpoint reflects plan
+        auth_header = {"HTTP_AUTHORIZATION": f"Bearer {RefreshToken.for_user(user).access_token}"}
+        resp = self.client.get("/api/v1/auth/me", **auth_header)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["subscription_tier"], "growth")
+        self.assertIsNotNone(data["plan"])
+        self.assertEqual(data["plan"]["name"], "Growth")
+        self.assertEqual(data["plan"]["links_limit"], 500)
+
+    def test_confirm_subscription_links_dynamic_plan(self):
+        from shortener.models import Plan, UserProfile
+
+        user = User.objects.create_user(username="checkoutuser", password="password123")
+        auth_header = {"HTTP_AUTHORIZATION": f"Bearer {RefreshToken.for_user(user).access_token}"}
+
+        resp = self.client.post(
+            "/api/v1/billing/confirm-subscription/",
+            data={
+                "plan": "premium",
+                "billing_cycle": "annual",
+                "payment_method": "card",
+            },
+            content_type="application/json",
+            **auth_header,
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        user.profile.refresh_from_db()
+        self.assertTrue(user.profile.is_subscribed)
+        self.assertEqual(user.profile.subscription_tier, "premium")
+        self.assertIsNotNone(user.profile.plan)
+        self.assertEqual(user.profile.plan.slug, "premium")
+

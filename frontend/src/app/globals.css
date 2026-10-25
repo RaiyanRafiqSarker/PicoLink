@@ -114,6 +114,9 @@ html.light header {
 
 .header-tagline {
   color: #94a3b8;
+  display: block;
+  max-width: 100%;
+  line-height: 1.25;
 }
 
 /* Brand logo title in Light Mode */

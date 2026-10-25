@@ -21,7 +21,7 @@ from django.db.models.functions import TruncDate
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password, check_password
 from django.core import signing
-from rest_framework import status, permissions
+from rest_framework import status, permissions, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -37,6 +37,8 @@ from .models import (
     Workspace,
     WorkspaceMember,
     WorkspaceInvitation,
+    Plan,
+    PlanFeature,
     get_or_create_personal_workspace,
 )
 from .serializers import (
@@ -55,6 +57,8 @@ from .serializers import (
     WorkspaceMemberSerializer,
     WorkspaceInvitationSerializer,
     WorkspaceDetailSerializer,
+    PlanSerializer,
+    PlanFeatureSerializer,
     get_slug_unavailable_reason,
 )
 from .permissions import get_user_workspace_role, get_request_workspace
@@ -758,13 +762,25 @@ class CreateSubscriptionIntentView(APIView):
         billing_cycle = request.data.get("billing_cycle", "annual").lower().strip()
         domain = request.data.get("domain", "").strip()
 
-        # Normalize plan
-        if plan not in settings.STRIPE_PLAN_PRICES:
-            plan = "pro"
+        # Check dynamic Plan in database first
+        target_plan = Plan.objects.filter(slug=plan, is_active=True).first()
+        if not target_plan and plan == "pro":
+            target_plan = Plan.objects.filter(slug="growth", is_active=True).first()
+
         if billing_cycle not in ["monthly", "annual"]:
             billing_cycle = "annual"
 
-        amount = settings.STRIPE_PLAN_PRICES[plan][billing_cycle]
+        if target_plan:
+            plan = target_plan.slug
+            if billing_cycle == "annual":
+                amount = int(target_plan.price_annual * 100)
+            else:
+                amount = int(target_plan.price_monthly * 100)
+        else:
+            if plan not in settings.STRIPE_PLAN_PRICES:
+                plan = "growth" if "growth" in settings.STRIPE_PLAN_PRICES else "pro"
+            amount = settings.STRIPE_PLAN_PRICES[plan][billing_cycle]
+
         currency = "usd"
 
         stripe_secret = getattr(settings, "STRIPE_SECRET_KEY", "")
@@ -817,9 +833,14 @@ class CreateSubscriptionIntentView(APIView):
             profile.save()
 
         # Compute annual savings
-        monthly_base = settings.STRIPE_PLAN_PRICES[plan]["monthly"] * 12
-        annual_price = settings.STRIPE_PLAN_PRICES[plan]["annual"]
-        savings = (monthly_base - annual_price) // 100 if billing_cycle == "annual" else 0
+        if target_plan:
+            monthly_base = int(target_plan.price_monthly * 12 * 100)
+            annual_price = int(target_plan.price_annual * 100)
+            savings = max(0, (monthly_base - annual_price) // 100) if billing_cycle == "annual" else 0
+        else:
+            monthly_base = settings.STRIPE_PLAN_PRICES[plan]["monthly"] * 12
+            annual_price = settings.STRIPE_PLAN_PRICES[plan]["annual"]
+            savings = (monthly_base - annual_price) // 100 if billing_cycle == "annual" else 0
 
         return Response({
             "client_secret": client_secret,
@@ -840,13 +861,20 @@ class ConfirmSubscriptionView(APIView):
 
     def post(self, request):
         user = request.user
-        plan = request.data.get("plan", "pro").lower().strip()
+        plan = request.data.get("plan", "growth").lower().strip()
         billing_cycle = request.data.get("billing_cycle", "annual").lower().strip()
         domain = request.data.get("domain", "").strip()
 
-        tier = UserProfile.TIER_PRO
+        target_plan = Plan.objects.filter(slug=plan, is_active=True).first()
+        if not target_plan and plan == "pro":
+            target_plan = Plan.objects.filter(slug="growth", is_active=True).first()
+
         profile, _ = UserProfile.objects.get_or_create(user=user)
-        profile.subscription_tier = tier
+        if target_plan:
+            profile.plan = target_plan
+            profile.subscription_tier = target_plan.slug
+        else:
+            profile.subscription_tier = UserProfile.TIER_PRO
         profile.is_subscribed = True
         profile.save()
 
@@ -1648,13 +1676,23 @@ class UserUpgradeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        plan_slug = request.data.get("plan", "growth").lower().strip()
+        target_plan = Plan.objects.filter(slug=plan_slug, is_active=True).first()
+        if not target_plan and plan_slug == "pro":
+            target_plan = Plan.objects.filter(slug="growth", is_active=True).first()
+
         profile, _ = UserProfile.objects.get_or_create(user=request.user)
-        profile.subscription_tier = UserProfile.TIER_PRO
+        if target_plan:
+            profile.plan = target_plan
+            profile.subscription_tier = target_plan.slug
+        else:
+            profile.subscription_tier = UserProfile.TIER_PRO
         profile.is_subscribed = True
         profile.save()
 
+        tier_title = target_plan.name if target_plan else "Pro"
         return Response({
-            "message": "Successfully upgraded to PicoLink Pro!",
+            "message": f"Successfully upgraded to PicoLink {tier_title}!",
             "user": UserMeSerializer(request.user).data,
             "quota": QuotaService.get_quota_info(request),
         })
@@ -1728,3 +1766,18 @@ class AdminURLDeleteView(APIView):
                 pass
 
         return Response({"message": f'URL "{code}" deleted successfully.'})
+
+
+# ==========================================
+# Phase 6: Subscription Plans ViewSet
+# ==========================================
+class PlanViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only endpoint (/api/v1/plans/) that exposes active subscription plans
+    and their dynamically ordered feature bullet points for the frontend pricing page.
+    """
+    queryset = Plan.objects.filter(is_active=True).prefetch_related("features").order_by("display_order", "id")
+    serializer_class = PlanSerializer
+    permission_classes = [permissions.AllowAny]
+    lookup_field = "slug"
+

@@ -1278,20 +1278,23 @@ export default function Home() {
       </div>
 
       {/* ========================================================= */}
-      {/* 1. TOP HEADER & NAVBAR REDESIGN                          */}
-      {/* ========================================================= */}
-      <header className="relative z-30 w-full bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/90 shadow-lg shadow-black/30">
+      <header
+        suppressHydrationWarning
+        className="relative z-30 w-full min-h-[4.25rem] bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/90 shadow-lg shadow-black/30"
+      >
         <div className="w-full px-4 sm:px-6 lg:px-8 py-3.5 flex flex-row items-center justify-between gap-4">
           {/* Brand & Tagline */}
-          <div className="flex items-center gap-3">
+          <div className="relative flex items-center gap-3 shrink-0">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/10 shrink-0">
               <Zap className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="relative flex flex-col justify-center min-w-0">
               <span className="brand-title text-xl font-extrabold tracking-tight block leading-tight">
                 PicoLink
               </span>
-              <p className="header-tagline text-xs mt-0.5">Make Long Links Simple & Trackable</p>
+              <p className="header-tagline text-xs mt-0.5 leading-snug whitespace-nowrap">
+                Make Long Links Simple &amp; Trackable
+              </p>
             </div>
           </div>
 

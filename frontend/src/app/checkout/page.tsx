@@ -41,11 +41,11 @@ interface PlanMeta {
   features: string[];
 }
 
-const PLANS: Record<string, PlanMeta> = {
+const DEFAULT_PLANS: Record<string, PlanMeta> = {
   core: {
     id: "core",
     name: "Core Plan",
-    monthlyPrice: 10,
+    monthlyPrice: 8,
     annualPrice: 96,
     annualPerMonth: 8,
     features: [
@@ -53,41 +53,59 @@ const PLANS: Record<string, PlanMeta> = {
       "5 custom back-halves",
       "5 dynamic QR codes",
       "1 Link-in-bio page",
-      "30-day analytics history",
+      "30 days of analytics history",
+    ],
+  },
+  growth: {
+    id: "growth",
+    name: "Growth Plan",
+    badge: "Recommended",
+    monthlyPrice: 24,
+    annualPrice: 288,
+    annualPerMonth: 24,
+    features: [
+      "500 short links / month",
+      "1 complimentary custom domain",
+      "30 dynamic QR codes with logo",
+      "1 year of click & scan data",
+      "Multi-channel Campaign tracking",
+      "City-level analytics & CSV export",
     ],
   },
   pro: {
-    id: "pro",
+    id: "growth",
     name: "Growth Plan",
     badge: "Recommended",
-    monthlyPrice: 35,
-    annualPrice: 348,
-    annualPerMonth: 29,
+    monthlyPrice: 24,
+    annualPrice: 288,
+    annualPerMonth: 24,
     features: [
-      "500 branded links / month",
-      "10 dynamic QR codes / month",
-      "10 Link-in-bio mobile pages",
-      "1 Complimentary custom domain",
-      "120-day click & geo analytics",
-      "Password protection & Burn-after-read",
+      "500 short links / month",
+      "1 complimentary custom domain",
+      "30 dynamic QR codes with logo",
+      "1 year of click & scan data",
+      "Multi-channel Campaign tracking",
+      "City-level analytics & CSV export",
     ],
   },
   premium: {
     id: "premium",
     name: "Premium Plan",
-    monthlyPrice: 199,
+    monthlyPrice: 149,
     annualPrice: 1788,
     annualPerMonth: 149,
     features: [
-      "3,000 branded links / month",
-      "Unlimited custom back-halves",
-      "3 Complimentary custom domains",
-      "Bulk CSV shortening engine",
-      "Outgoing real-time click webhooks",
-      "1-year historical analytics retention",
+      "3,000 short links / month",
+      "3 custom domains included",
+      "500 dynamic QR codes",
+      "2 years of click & scan data",
+      "Bulk link creation via CSV upload",
+      "REST API & Webhook alerts",
     ],
   },
 };
+
+const PLANS = DEFAULT_PLANS;
 
 // Card brand types and icons
 type CardBrand = "visa" | "mastercard" | "amex" | "discover" | "generic";
@@ -821,14 +839,51 @@ function CheckoutView() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const planId = searchParams.get("plan") || "pro";
+  const rawPlanId = (searchParams.get("plan") || "growth").toLowerCase();
+  const initialPlanId = rawPlanId === "pro" ? "growth" : (DEFAULT_PLANS[rawPlanId] ? rawPlanId : "growth");
   const initialBilling = (searchParams.get("billing") as "annual" | "monthly") || "annual";
   const domain = searchParams.get("domain") || "";
 
-  const [selectedPlanId, setSelectedPlanId] = useState<string>(
-    PLANS[planId] ? planId : "pro"
-  );
+  const [plansMap, setPlansMap] = useState<Record<string, PlanMeta>>(DEFAULT_PLANS);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>(initialPlanId);
   const [billingCycle, setBillingCycle] = useState<"annual" | "monthly">(initialBilling);
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  // Dynamic Plans Loader from Django Admin Database API
+  useEffect(() => {
+    fetch(`${API_BASE}/api/v1/plans/`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const dynamicMap: Record<string, PlanMeta> = { ...DEFAULT_PLANS };
+          data.forEach((p: any) => {
+            const mPrice = parseFloat(p.price_monthly) || 0;
+            const aPrice = parseFloat(p.price_annual) || 0;
+            const perMonth = aPrice > 0 ? Math.round(aPrice / 12) : mPrice;
+            const featList: string[] = Array.isArray(p.features)
+              ? p.features.filter((f: any) => f.is_included).map((f: any) => f.text)
+              : [];
+            dynamicMap[p.slug] = {
+              id: p.slug,
+              name: `${p.name} Plan`,
+              badge: p.is_popular ? "Recommended" : undefined,
+              monthlyPrice: mPrice,
+              annualPrice: aPrice,
+              annualPerMonth: perMonth,
+              features: featList.length > 0 ? featList : (DEFAULT_PLANS[p.slug]?.features || []),
+            };
+          });
+          if (dynamicMap["growth"]) {
+            dynamicMap["pro"] = dynamicMap["growth"];
+          }
+          setPlansMap(dynamicMap);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch dynamic plans for checkout, using defaults:", err);
+      });
+  }, [API_BASE]);
 
   // Theme Detection & Toggle
   const [isDark, setIsDark] = useState(true);
@@ -879,15 +934,13 @@ function CheckoutView() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
 
-  const plan = PLANS[selectedPlanId] || PLANS.pro;
+  const plan = plansMap[selectedPlanId] || plansMap.growth || DEFAULT_PLANS.growth;
 
   // Calculation
   const basePrice = billingCycle === "annual" ? plan.annualPrice : plan.monthlyPrice;
   const promoDiscount = (basePrice * promoDiscountPct) / 100;
   const totalAmount = Math.max(0, basePrice - promoDiscount);
   const annualSavings = (plan.monthlyPrice * 12) - plan.annualPrice;
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Initialize Stripe client secret from backend
   useEffect(() => {
@@ -937,7 +990,10 @@ function CheckoutView() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#070b16] text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white transition-colors duration-200">
       {/* Top Simple Header */}
-      <header className="sticky top-0 z-30 w-full h-16 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#080d1a]/95 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between">
+      <header
+        suppressHydrationWarning
+        className="sticky top-0 z-30 w-full h-16 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#080d1a]/95 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between"
+      >
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
@@ -1017,20 +1073,22 @@ function CheckoutView() {
               </div>
 
               <div className="flex items-center gap-1 text-xs">
-                {Object.keys(PLANS).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSelectedPlanId(key)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                      selectedPlanId === key
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    }`}
-                  >
-                    {key.toUpperCase()}
-                  </button>
-                ))}
+                {Object.keys(plansMap)
+                  .filter((key) => key !== "pro" && key !== "enterprise")
+                  .map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedPlanId(key)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                        selectedPlanId === key
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      {plansMap[key]?.name?.replace(" Plan", "").toUpperCase() || key.toUpperCase()}
+                    </button>
+                  ))}
               </div>
             </div>
 

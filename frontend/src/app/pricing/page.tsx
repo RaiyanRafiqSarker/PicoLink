@@ -118,19 +118,23 @@ export default function PricingPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-[#070e1e] text-slate-900 dark:text-slate-100 flex flex-col justify-between selection:bg-blue-600 selection:text-white theme-root relative overflow-x-hidden">
       {/* ========================================================= */}
       {/* 1. TOP HEADER & NAVBAR                                   */}
-      {/* ========================================================= */}
-      <header className="relative z-30 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/90 shadow-sm dark:shadow-lg dark:shadow-black/30">
+      <header
+        suppressHydrationWarning
+        className="relative z-30 w-full min-h-[4.25rem] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/90 shadow-sm dark:shadow-lg dark:shadow-black/30"
+      >
         <div className="w-full px-4 sm:px-6 lg:px-8 py-3.5 flex flex-row items-center justify-between gap-4">
           {/* Brand & Tagline */}
-          <Link href="/" className="flex items-center gap-3 group">
+          <Link href="/" className="relative flex items-center gap-3 group shrink-0">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/10 shrink-0 group-hover:scale-105 transition-transform">
               <Zap className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="relative flex flex-col justify-center min-w-0">
               <span className="brand-title text-xl font-extrabold tracking-tight block leading-tight text-slate-900 dark:text-white">
                 PicoLink
               </span>
-              <p className="header-tagline text-xs mt-0.5 text-slate-500 dark:text-slate-400">Make Long Links Simple &amp; Trackable</p>
+              <p className="header-tagline text-xs mt-0.5 leading-snug text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                Make Long Links Simple &amp; Trackable
+              </p>
             </div>
           </Link>
 

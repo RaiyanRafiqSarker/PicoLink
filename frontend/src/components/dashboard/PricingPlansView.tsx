@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Check,
@@ -23,6 +23,32 @@ interface PricingPlansViewProps {
 }
 
 type BillingCycle = "annual" | "monthly";
+
+export interface DynamicPlanFeature {
+  id: number;
+  text: string;
+  is_included: boolean;
+  display_order: number;
+}
+
+export interface DynamicPlan {
+  id: number;
+  name: string;
+  slug: string;
+  tagline: string;
+  price_monthly: string;
+  price_annual: string;
+  stripe_price_id_monthly: string;
+  stripe_price_id_annual: string;
+  links_limit: number;
+  custom_domains_limit: number;
+  qr_codes_limit: number;
+  bio_pages_limit: number;
+  is_popular: boolean;
+  is_active: boolean;
+  display_order: number;
+  features: DynamicPlanFeature[];
+}
 
 interface PlanFeatureRow {
   name: string;
@@ -48,6 +74,28 @@ export default function PricingPlansView({
 }: PricingPlansViewProps) {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("annual");
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [dynamicPlans, setDynamicPlans] = useState<DynamicPlan[]>([]);
+  const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+        const res = await fetch(`${apiBase}/api/v1/plans/`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setDynamicPlans(data);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic plans, using resilient fallbacks:", err);
+      } finally {
+        setIsLoadingPlans(false);
+      }
+    };
+    fetchPlans();
+  }, []);
 
   const toggleCategory = (catId: string) => {
     setCollapsedCategories((prev) => ({
@@ -57,7 +105,7 @@ export default function PricingPlansView({
   };
 
   const handlePlanSelect = (planName: string) => {
-    if (planName === "Enterprise") {
+    if (planName.toLowerCase() === "enterprise") {
       toast.info("Enterprise Consultation", {
         description: "Our enterprise solutions team will contact you shortly.",
       });
@@ -66,10 +114,11 @@ export default function PricingPlansView({
 
     const tierMap: Record<string, string> = {
       Core: "core",
-      Growth: "pro",
+      Growth: "growth",
       Premium: "premium",
+      Pro: "pro",
     };
-    const tier = tierMap[planName] || "pro";
+    const tier = tierMap[planName] || planName.toLowerCase();
 
     let checkoutUrl = `/checkout?plan=${tier}&billing=${billingCycle}`;
     if (targetDomain) {
@@ -390,6 +439,28 @@ export default function PricingPlansView({
     );
   };
 
+  const corePlan = dynamicPlans.find((p) => p.slug === "core");
+  const growthPlan = dynamicPlans.find((p) => p.slug === "growth");
+  const premiumPlan = dynamicPlans.find((p) => p.slug === "premium");
+
+  const coreTablePrice = corePlan
+    ? billingCycle === "annual"
+      ? `$${Math.round(parseFloat(corePlan.price_annual) / 12) || Math.round(parseFloat(corePlan.price_monthly))}/mo`
+      : `$${Math.round(parseFloat(corePlan.price_monthly))}/mo`
+    : billingCycle === "annual" ? "$8/mo" : "$10/mo";
+
+  const growthTablePrice = growthPlan
+    ? billingCycle === "annual"
+      ? `$${Math.round(parseFloat(growthPlan.price_annual) / 12) || Math.round(parseFloat(growthPlan.price_monthly))}/mo`
+      : `$${Math.round(parseFloat(growthPlan.price_monthly))}/mo`
+    : billingCycle === "annual" ? "$24/mo" : "$29/mo";
+
+  const premiumTablePrice = premiumPlan
+    ? billingCycle === "annual"
+      ? `$${Math.round(parseFloat(premiumPlan.price_annual) / 12) || Math.round(parseFloat(premiumPlan.price_monthly))}/mo`
+      : `$${Math.round(parseFloat(premiumPlan.price_monthly))}/mo`
+    : billingCycle === "annual" ? "$149/mo" : "$199/mo";
+
   return (
     <div className="pricing-plans-page w-full min-h-screen bg-slate-50 dark:bg-[#080d1a] text-slate-900 dark:text-white pb-24 transition-colors">
       {/* Top Header / Nav Bar (relative so it stays at the top and doesn't move with scrolling) */}
@@ -499,248 +570,346 @@ export default function PricingPlansView({
       {/* 4 Primary Plan Cards (Core, Growth, Premium, Enterprise) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
-          {/* 1. Core Plan */}
-          <div className="pricing-card relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
-            <div className="space-y-4">
-              <div>
-                <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Core</h3>
-                <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
-                  For individuals and creators who need custom links and essential QR codes.
-                </p>
+          {dynamicPlans.length > 0 ? (
+            dynamicPlans.map((plan) => {
+              const isEnterprise = plan.slug === "enterprise" || parseFloat(plan.price_monthly) === 0;
+              const monthlyRate = parseFloat(plan.price_monthly);
+              const annualRate = parseFloat(plan.price_annual);
+
+              const displayPrice = isEnterprise
+                ? "Custom"
+                : billingCycle === "annual"
+                ? `$${Math.round(annualRate > 0 ? annualRate / 12 : monthlyRate)}`
+                : `$${Math.round(monthlyRate)}`;
+
+              const displayPeriod = isEnterprise
+                ? "Tailored volume & multi-year agreement"
+                : billingCycle === "annual"
+                ? `Billed annually ($${Math.round(annualRate > 0 ? annualRate : monthlyRate * 12)}/yr)`
+                : "Billed monthly";
+
+              return (
+                <div
+                  key={plan.id}
+                  className={`pricing-card relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl transition ${
+                    plan.is_popular
+                      ? "pricing-card-growth bg-white dark:bg-slate-900 border-2 border-blue-600 shadow-xl shadow-blue-500/10 transform lg:-translate-y-2"
+                      : "bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md"
+                  }`}
+                >
+                  {plan.is_popular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-600 text-white text-[11px] font-extrabold tracking-wider uppercase shadow-md flex items-center gap-1.5">
+                      <Flame className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                      <span>Recommended</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white flex items-center justify-between">
+                        <span>{plan.name}</span>
+                      </h3>
+                      <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
+                        {plan.tagline}
+                      </p>
+                    </div>
+
+                    <div className="py-2">
+                      <div className="flex items-baseline gap-1">
+                        <span className={`pricing-card-price ${isEnterprise ? "text-3xl" : "text-4xl"} font-black text-slate-900 dark:text-white`}>
+                          {displayPrice}
+                        </span>
+                        {!isEnterprise && <span className="text-sm font-medium text-slate-500">/month</span>}
+                      </div>
+                      <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
+                        {displayPeriod}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handlePlanSelect(plan.name)}
+                      className={`w-full py-2.5 px-4 rounded-xl font-bold text-sm transition shadow-sm ${
+                        isEnterprise
+                          ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100"
+                          : plan.is_popular
+                          ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 transform hover:-translate-y-0.5"
+                          : "border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                      }`}
+                    >
+                      {isEnterprise ? "Contact Sales" : "Get Started"}
+                    </button>
+
+                    {plan.features && plan.features.length > 0 && (
+                      <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                        <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
+                          {plan.name === "Growth"
+                            ? "Everything in Core, plus:"
+                            : plan.name === "Premium"
+                            ? "Everything in Growth, plus:"
+                            : plan.name === "Enterprise"
+                            ? "Enterprise highlights:"
+                            : `${plan.name} includes:`}
+                        </p>
+                        {plan.features
+                          .filter((f) => f.is_included)
+                          .sort((a, b) => a.display_order - b.display_order)
+                          .map((feat) => (
+                            <div key={feat.id} className="flex items-start gap-2">
+                              <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                              <span className="pricing-card-feature">{feat.text}</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <>
+              {/* 1. Core Plan */}
+              <div className="pricing-card relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Core</h3>
+                    <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
+                      For individuals and creators who need custom links and essential QR codes.
+                    </p>
+                  </div>
+
+                  <div className="py-2">
+                    <div className="flex items-baseline gap-1">
+                      <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
+                        ${billingCycle === "annual" ? "8" : "10"}
+                      </span>
+                      <span className="text-sm font-medium text-slate-500">/month</span>
+                    </div>
+                    <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
+                      {billingCycle === "annual" ? "Billed annually ($96/yr)" : "Billed monthly"}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handlePlanSelect("Core")}
+                    className="w-full py-2.5 px-4 rounded-xl border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-sm transition shadow-sm"
+                  >
+                    Get Started
+                  </button>
+
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                    <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
+                      Core includes:
+                    </p>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>100</strong> short links / month</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>5</strong> custom back-halves</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>30 days</strong> of analytics history</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>5</strong> dynamic QR codes</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">1 Link-in-bio page</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="py-2">
-                <div className="flex items-baseline gap-1">
-                  <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
-                    ${billingCycle === "annual" ? "8" : "10"}
-                  </span>
-                  <span className="text-sm font-medium text-slate-500">/month</span>
+              {/* 2. Growth Plan */}
+              <div className="pricing-card pricing-card-growth relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900 border-2 border-blue-600 shadow-xl shadow-blue-500/10 transition transform lg:-translate-y-2">
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-600 text-white text-[11px] font-extrabold tracking-wider uppercase shadow-md flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                  <span>Recommended</span>
                 </div>
-                <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
-                  {billingCycle === "annual" ? "Billed annually ($96/yr)" : "Billed monthly"}
-                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white flex items-center justify-between">
+                      <span>Growth</span>
+                    </h3>
+                    <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
+                      For small businesses and growing teams looking to engage audiences.
+                    </p>
+                  </div>
+
+                  <div className="py-2">
+                    <div className="flex items-baseline gap-1">
+                      <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
+                        ${billingCycle === "annual" ? "24" : "29"}
+                      </span>
+                      <span className="text-sm font-medium text-slate-500">/month</span>
+                    </div>
+                    <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
+                      {billingCycle === "annual" ? "Billed annually ($288/yr)" : "Billed monthly"}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handlePlanSelect("Growth")}
+                    className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition shadow-lg shadow-blue-600/30 transform hover:-translate-y-0.5"
+                  >
+                    Get Started
+                  </button>
+
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                    <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
+                      Everything in Core, plus:
+                    </p>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>500</strong> short links / month</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>1 complimentary</strong> custom domain</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>1 year</strong> of click &amp; scan data</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>30</strong> dynamic QR codes with logo</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">Multi-channel Campaign tracking</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">City-level analytics &amp; CSV export</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <button
-                onClick={() => handlePlanSelect("Core")}
-                className="w-full py-2.5 px-4 rounded-xl border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-sm transition shadow-sm"
-              >
-                Get Started
-              </button>
+              {/* 3. Premium Plan */}
+              <div className="pricing-card relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Premium</h3>
+                    <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
+                      For scaling brands and marketing agencies needing campaign-level tracking.
+                    </p>
+                  </div>
 
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
-                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
-                  Core includes:
-                </p>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>100</strong> short links / month</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>5</strong> custom back-halves</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>30 days</strong> of analytics history</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>5</strong> dynamic QR codes</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">1 Link-in-bio page</span>
+                  <div className="py-2">
+                    <div className="flex items-baseline gap-1">
+                      <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
+                        ${billingCycle === "annual" ? "149" : "199"}
+                      </span>
+                      <span className="text-sm font-medium text-slate-500">/month</span>
+                    </div>
+                    <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
+                      {billingCycle === "annual" ? "Billed annually ($1,788/yr)" : "Billed monthly"}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handlePlanSelect("Premium")}
+                    className="w-full py-2.5 px-4 rounded-xl border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-sm transition shadow-sm"
+                  >
+                    Get Started
+                  </button>
+
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                    <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
+                      Everything in Growth, plus:
+                    </p>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>3,000</strong> short links / month</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>3</strong> custom domains included</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>2 years</strong> of click &amp; scan data</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>500</strong> dynamic QR codes</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">Bulk link creation via CSV upload</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">REST API &amp; Webhook alerts</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* 2. Growth Plan (RECOMMENDED - Highlighted matching Screenshot) */}
-          <div className="pricing-card pricing-card-growth relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900 border-2 border-blue-600 shadow-xl shadow-blue-500/10 transition transform lg:-translate-y-2">
-            {/* Recommended Top Header Badge */}
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-600 text-white text-[11px] font-extrabold tracking-wider uppercase shadow-md flex items-center gap-1.5">
-              <Flame className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
-              <span>Recommended</span>
-            </div>
+              {/* 4. Enterprise Plan */}
+              <div className="pricing-card relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Enterprise</h3>
+                    <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
+                      For large organizations requiring custom scale, security, and dedicated support.
+                    </p>
+                  </div>
 
-            <div className="space-y-4">
-              <div>
-                <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white flex items-center justify-between">
-                  <span>Growth</span>
-                </h3>
-                <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
-                  For small businesses and growing teams looking to engage audiences.
-                </p>
-              </div>
+                  <div className="py-2">
+                    <div className="flex items-baseline gap-1">
+                      <span className="pricing-card-price text-3xl font-black text-slate-900 dark:text-white">
+                        Custom
+                      </span>
+                    </div>
+                    <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
+                      Tailored volume &amp; multi-year agreement
+                    </p>
+                  </div>
 
-              <div className="py-2">
-                <div className="flex items-baseline gap-1">
-                  <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
-                    ${billingCycle === "annual" ? "24" : "29"}
-                  </span>
-                  <span className="text-sm font-medium text-slate-500">/month</span>
-                </div>
-                <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
-                  {billingCycle === "annual" ? "Billed annually ($288/yr)" : "Billed monthly"}
-                </p>
-              </div>
+                  <button
+                    onClick={() => handlePlanSelect("Enterprise")}
+                    className="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-bold text-sm transition shadow-sm"
+                  >
+                    Contact Sales
+                  </button>
 
-              <button
-                onClick={() => handlePlanSelect("Growth")}
-                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition shadow-lg shadow-blue-600/30 transform hover:-translate-y-0.5"
-              >
-                Get Started
-              </button>
-
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
-                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
-                  Everything in Core, plus:
-                </p>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>500</strong> short links / month</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>1 complimentary</strong> custom domain</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>1 year</strong> of click &amp; scan data</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>30</strong> dynamic QR codes with logo</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">Multi-channel Campaign tracking</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">City-level analytics &amp; CSV export</span>
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
+                    <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
+                      Enterprise highlights:
+                    </p>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature"><strong>10,000+</strong> links / month</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">Single Sign-On (SSO / SAML / SCIM)</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">Team collaboration &amp; RBAC roles</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">99.99% uptime guarantee SLA</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span className="pricing-card-feature">Dedicated Customer Success Manager</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* 3. Premium Plan */}
-          <div className="pricing-card relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
-            <div className="space-y-4">
-              <div>
-                <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Premium</h3>
-                <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
-                  For scaling brands and marketing agencies needing campaign-level tracking.
-                </p>
-              </div>
-
-              <div className="py-2">
-                <div className="flex items-baseline gap-1">
-                  <span className="pricing-card-price text-4xl font-black text-slate-900 dark:text-white">
-                    ${billingCycle === "annual" ? "149" : "199"}
-                  </span>
-                  <span className="text-sm font-medium text-slate-500">/month</span>
-                </div>
-                <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
-                  {billingCycle === "annual" ? "Billed annually ($1,788/yr)" : "Billed monthly"}
-                </p>
-              </div>
-
-              <button
-                onClick={() => handlePlanSelect("Premium")}
-                className="w-full py-2.5 px-4 rounded-xl border-2 border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold text-sm transition shadow-sm"
-              >
-                Get Started
-              </button>
-
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
-                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
-                  Everything in Growth, plus:
-                </p>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>3,000</strong> short links / month</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>3</strong> custom domains included</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>2 years</strong> of click &amp; scan data</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>500</strong> dynamic QR codes</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">Bulk link creation via CSV upload</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">REST API &amp; Webhook alerts</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Enterprise Plan */}
-          <div className="pricing-card relative flex flex-col justify-between p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
-            <div className="space-y-4">
-              <div>
-                <h3 className="pricing-card-title text-xl font-extrabold text-slate-900 dark:text-white">Enterprise</h3>
-                <p className="pricing-card-desc text-sm text-slate-500 dark:text-slate-400 mt-1 min-h-[36px]">
-                  For large organizations requiring custom scale, security, and dedicated support.
-                </p>
-              </div>
-
-              <div className="py-2">
-                <div className="flex items-baseline gap-1">
-                  <span className="pricing-card-price text-3xl font-black text-slate-900 dark:text-white">
-                    Custom
-                  </span>
-                </div>
-                <p className="pricing-card-period text-xs text-slate-400 mt-0.5">
-                  Tailored volume &amp; multi-year agreement
-                </p>
-              </div>
-
-              <button
-                onClick={() => handlePlanSelect("Enterprise")}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-bold text-sm transition shadow-sm"
-              >
-                Contact Sales
-              </button>
-
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 text-sm text-slate-900 dark:text-slate-200">
-                <p className="pricing-card-feature-header font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
-                  Enterprise highlights:
-                </p>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature"><strong>10,000+</strong> links / month</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">Single Sign-On (SSO / SAML / SCIM)</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">Team collaboration &amp; RBAC roles</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">99.99% uptime guarantee SLA</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="pricing-card-feature">Dedicated Customer Success Manager</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -767,7 +936,7 @@ export default function PricingPlansView({
                 <th className="py-5 px-4 text-center w-[15%]">
                   <div className="font-extrabold text-sm text-slate-900 dark:text-white">Core</div>
                   <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-0.5">
-                    ${billingCycle === "annual" ? "8" : "10"}/mo
+                    {coreTablePrice}
                   </div>
                   <button
                     onClick={() => handlePlanSelect("Core")}
@@ -782,7 +951,7 @@ export default function PricingPlansView({
                   </div>
                   <div className="font-extrabold text-sm text-slate-900 dark:text-white">Growth</div>
                   <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-0.5">
-                    ${billingCycle === "annual" ? "24" : "29"}/mo
+                    {growthTablePrice}
                   </div>
                   <button
                     onClick={() => handlePlanSelect("Growth")}
@@ -794,7 +963,7 @@ export default function PricingPlansView({
                 <th className="py-5 px-4 text-center w-[15%]">
                   <div className="font-extrabold text-sm text-slate-900 dark:text-white">Premium</div>
                   <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-0.5">
-                    ${billingCycle === "annual" ? "149" : "199"}/mo
+                    {premiumTablePrice}
                   </div>
                   <button
                     onClick={() => handlePlanSelect("Premium")}

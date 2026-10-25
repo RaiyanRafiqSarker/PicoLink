@@ -12,6 +12,8 @@ from .models import (
     Workspace,
     WorkspaceMember,
     WorkspaceInvitation,
+    Plan,
+    PlanFeature,
 )
 from .utils.ssrf import validate_url_safety, is_slug_reserved
 
@@ -135,9 +137,12 @@ class UserMeSerializer(serializers.Serializer):
     is_subscribed = serializers.SerializerMethodField()
     is_pro = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
+    plan = serializers.SerializerMethodField()
 
     def get_subscription_tier(self, obj):
         profile = getattr(obj, "profile", None)
+        if profile and profile.plan:
+            return profile.plan.slug
         return profile.subscription_tier if profile else ("pro" if obj.is_superuser else "free")
 
     def get_is_subscribed(self, obj):
@@ -151,6 +156,23 @@ class UserMeSerializer(serializers.Serializer):
     def get_avatar_url(self, obj):
         profile = getattr(obj, "profile", None)
         return profile.avatar_url if profile and profile.avatar_url else ""
+
+    def get_plan(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile and profile.plan:
+            p = profile.plan
+            return {
+                "id": p.id,
+                "name": p.name,
+                "slug": p.slug,
+                "price_monthly": str(p.price_monthly),
+                "price_annual": str(p.price_annual),
+                "links_limit": p.links_limit,
+                "custom_domains_limit": p.custom_domains_limit,
+                "qr_codes_limit": p.qr_codes_limit,
+                "bio_pages_limit": p.bio_pages_limit,
+            }
+        return None
 
 
 class UserRegisterSerializer(serializers.Serializer):
@@ -332,3 +354,45 @@ class WorkspaceDetailSerializer(serializers.ModelSerializer):
             pending = obj.invitations.filter(is_accepted=False, expires_at__gte=timezone.now())
             return WorkspaceInvitationSerializer(pending, many=True).data
         return []
+
+
+# ==========================================
+# Phase 6: Subscription Plans Serializers
+# ==========================================
+class PlanFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlanFeature
+        fields = [
+            "id",
+            "text",
+            "is_included",
+            "display_order",
+        ]
+
+
+class PlanSerializer(serializers.ModelSerializer):
+    features = PlanFeatureSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Plan
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "tagline",
+            "price_monthly",
+            "price_annual",
+            "stripe_price_id_monthly",
+            "stripe_price_id_annual",
+            "links_limit",
+            "custom_domains_limit",
+            "qr_codes_limit",
+            "bio_pages_limit",
+            "is_popular",
+            "is_active",
+            "display_order",
+            "features",
+            "created_at",
+            "updated_at",
+        ]
+

@@ -51,13 +51,24 @@ class QuotaService:
         if not user or not user.is_authenticated:
             return "guest", GUEST_DAILY_LIMIT
 
-        profile, _ = UserProfile.objects.get_or_create(
+        profile, _ = UserProfile.objects.select_related("plan").get_or_create(
             user=user,
             defaults={
                 "subscription_tier": UserProfile.TIER_PRO if user.is_superuser else UserProfile.TIER_FREE,
                 "is_subscribed": user.is_superuser,
             }
         )
+
+        if user.is_superuser:
+            return "enterprise", None
+
+        # Check for dynamic database-configured subscription plan
+        if profile.plan:
+            slug = profile.plan.slug
+            links_lim = profile.plan.links_limit
+            # A negative limit or 0 for unlimited enterprise tiers
+            limit = None if links_lim < 0 else links_lim
+            return slug, limit
 
         if profile.is_pro:
             return "pro", None
@@ -76,8 +87,8 @@ class QuotaService:
         elif tier == "free":
             key = f"ratelimit:user:{user.id}:{today_str}"
         else:
-            # Pro tier
-            key = f"ratelimit:pro:{user.id}:{today_str}"
+            # Dynamic plan or pro tier
+            key = f"ratelimit:{tier}:{user.id}:{today_str}"
 
         return key, tier, limit
 
@@ -134,12 +145,12 @@ class QuotaService:
         used = cls.get_current_used(key)
         resets_at = get_next_midnight_utc_iso()
 
-        if tier == "pro":
+        if limit is None:
             remaining = None
             is_exhausted = False
         else:
-            remaining = max(0, limit - used) if limit is not None else None
-            is_exhausted = (remaining == 0) if remaining is not None else False
+            remaining = max(0, limit - used)
+            is_exhausted = (remaining == 0)
 
         user = getattr(request, "user", None)
         is_authenticated = bool(user and user.is_authenticated)
@@ -158,18 +169,23 @@ class QuotaService:
     def check_and_enforce_quota(cls, request) -> tuple[bool, dict]:
         key, tier, limit = cls.get_quota_key(request)
 
-        # Pro tier: unlimited
-        if tier == "pro" or limit is None:
+        # Unlimited plans
+        if limit is None:
             cls.increment_usage(key)
             info = cls.get_quota_info(request)
             return True, info
 
         used = cls.get_current_used(key)
 
-        # Check if daily limit already reached
+        # Check if limit already reached
         if used >= limit:
             info = cls.get_quota_info(request)
-            message = GUEST_LIMIT_MESSAGE if tier == "guest" else FREE_LIMIT_MESSAGE
+            if tier == "guest":
+                message = GUEST_LIMIT_MESSAGE
+            elif tier == "free":
+                message = FREE_LIMIT_MESSAGE
+            else:
+                message = f"You've reached your limit of {limit} links for the {tier.title()} plan."
             info["message"] = message
             return False, info
 

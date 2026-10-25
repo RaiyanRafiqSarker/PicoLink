@@ -68,8 +68,8 @@ from .models import UserProfile, DailyQuotaRecord
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "subscription_tier", "is_subscribed", "google_id", "created_at")
-    list_filter = ("subscription_tier", "is_subscribed")
+    list_display = ("user", "plan", "subscription_tier", "is_subscribed", "google_id", "created_at")
+    list_filter = ("plan", "subscription_tier", "is_subscribed")
     search_fields = ("user__username", "user__email", "google_id")
 
 
@@ -78,4 +78,34 @@ class DailyQuotaRecordAdmin(admin.ModelAdmin):
     list_display = ("key", "count", "date", "updated_at")
     list_filter = ("date",)
     search_fields = ("key",)
+
+
+from .models import Plan, PlanFeature
+
+
+class PlanFeatureInline(admin.TabularInline):
+    model = PlanFeature
+    extra = 1
+    fields = ("text", "is_included", "display_order")
+    ordering = ("display_order", "id")
+
+
+@admin.register(Plan)
+class PlanAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "price_monthly",
+        "price_annual",
+        "is_popular",
+        "is_active",
+        "display_order",
+        "links_limit",
+        "custom_domains_limit",
+    )
+    list_editable = ("is_popular", "is_active", "display_order")
+    list_filter = ("is_active", "is_popular")
+    search_fields = ("name", "slug", "tagline")
+    prepopulated_fields = {"slug": ("name",)}
+    inlines = [PlanFeatureInline]
+    ordering = ("display_order", "id")
 
